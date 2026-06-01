@@ -33,9 +33,6 @@ public class AccountTransactionService {
         this.accountingServiceClient = accountingServiceClient;
     }
 
-    /**
-     * RF-02: Depósito en Efectivo por Ventanilla
-     */
     @Transactional(rollbackFor = Exception.class)
     public void executeDeposit(TellerTransactionReqDTO dto) {
         validateIdempotency(dto.transactionUuid());
@@ -49,16 +46,13 @@ public class AccountTransactionService {
 
         LocalDate accountingDate = calculateAccountingDate();
 
-        // 1. Afectar saldo local comercial
         account.setAvailableBalance(account.getAvailableBalance().add(dto.amount()));
         account.setAccountingBalance(account.getAccountingBalance().add(dto.amount()));
         accountRepository.save(account);
 
-        // 2. Registrar transacción local (Se guardará en la partición mensual correspondiente)
         AccountTransaction tx = createLocalTransaction(account, dto.amount(), "CREDIT", "DEP", dto.transactionUuid(), accountingDate);
         transactionRepository.save(tx);
 
-        // 3. Orquestar Asiento Contable - Contrapartida obligatoria: Bóveda Central (1.1.0.02)
         List<AccountingEntryReqDTO.JournalLineDTO> lines = List.of(
                 new AccountingEntryReqDTO.JournalLineDTO("1.1.0.02", "DEBIT", dto.amount(), "Depósito Ventanilla - Efectivo en Caja"),
                 new AccountingEntryReqDTO.JournalLineDTO(getAccountClassCode(account), "CREDIT", dto.amount(), "Abono Cuenta Cliente")
@@ -66,13 +60,9 @@ public class AccountTransactionService {
 
         AccountingEntryReqDTO entry = new AccountingEntryReqDTO(dto.transactionUuid(), "Depósito Ventanilla Cuenta " + dto.accountNumber(), lines);
 
-        // Si esta llamada falla o da timeout, @Transactional ejecuta el REVERSO automático local
         accountingServiceClient.sendAccountingEntry(entry);
     }
 
-    /**
-     * RF-04: Débito Corporativo y desglose automático de comisión e IVA
-     */
     @Transactional(rollbackFor = Exception.class)
     public void executeCorporateDebit(CorporateDebitReqDTO dto) {
         validateIdempotency(dto.transactionUuid());
@@ -82,9 +72,7 @@ public class AccountTransactionService {
 
         BigDecimal totalDebit = dto.totalAmount().add(dto.commissionAmount());
 
-        // Regla de negocio: Permitir sobregiro si se especifica, o validar saldo disponible
         if (companyAccount.getAvailableBalance().compareTo(totalDebit) < 0) {
-            // Nota de negocio del RF-07 Switch permite sobregiro si es comisión final, ajusta según control estricto
             companyAccount.setAvailableBalance(companyAccount.getAvailableBalance().subtract(totalDebit));
         } else {
             companyAccount.setAvailableBalance(companyAccount.getAvailableBalance().subtract(totalDebit));
@@ -96,12 +84,11 @@ public class AccountTransactionService {
         AccountTransaction tx = createLocalTransaction(companyAccount, totalDebit, "DEBIT", "DEB_CORP", dto.transactionUuid(), accountingDate);
         transactionRepository.save(tx);
 
-        // Cálculos de Impuestos internos obligatorios (RF-04)
+
         BigDecimal commissionSubtotal = dto.commissionAmount();
         BigDecimal ivaAmount = commissionSubtotal.multiply(new BigDecimal("0.15"));
         BigDecimal totalCommissionWithIva = commissionSubtotal.add(ivaAmount);
 
-        // Construir líneas del asiento contable de partida doble delegando la lógica financiera
         List<AccountingEntryReqDTO.JournalLineDTO> lines = new ArrayList<>();
         lines.add(new AccountingEntryReqDTO.JournalLineDTO(getAccountClassCode(companyAccount), "DEBIT", dto.totalAmount().add(totalCommissionWithIva), "Débito Global Nómina y Servicios"));
         lines.add(new AccountingEntryReqDTO.JournalLineDTO("4.1.0.01", "CREDIT", commissionSubtotal, "Ingresos por Servicios Masivos"));

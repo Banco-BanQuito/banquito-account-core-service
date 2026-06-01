@@ -30,8 +30,7 @@ public class AccountingServiceClient {
                                 .flatMap(errorBody -> Mono.error(new RuntimeException("Error en contabilidad: " + errorBody)))
                 )
                 .toBodilessEntity()
-                // Timeout estricto de 5 segundos requerido por la especificación
                 .timeout(Duration.ofSeconds(5))
-                .block(); // Bloqueante porque el flujo del Core debe ser síncrono
+                .block();
     }
 }
