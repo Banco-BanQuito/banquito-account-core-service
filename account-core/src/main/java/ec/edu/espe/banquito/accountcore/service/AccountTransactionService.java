@@ -4,6 +4,7 @@ import ec.edu.espe.banquito.accountcore.client.AccountingServiceClient;
 import ec.edu.espe.banquito.accountcore.dto.AccountingEntryReqDTO;
 import ec.edu.espe.banquito.accountcore.dto.CorporateDebitReqDTO;
 import ec.edu.espe.banquito.accountcore.dto.TellerTransactionReqDTO;
+import ec.edu.espe.banquito.accountcore.dto.TransferP2PReqDTO;
 import ec.edu.espe.banquito.accountcore.model.Account;
 import ec.edu.espe.banquito.accountcore.model.AccountTransaction;
 import ec.edu.espe.banquito.accountcore.repository.AccountRepository;
@@ -135,5 +136,71 @@ public class AccountTransactionService {
 
     private String getAccountClassCode(Account account) {
         return "AHORROS".equalsIgnoreCase(account.getAccountType()) ? "2.1.0.01" : "2.1.0.02";
+    }
+
+    /**
+     * RF-02 / RF-07 Core: Ejecuta una transferencia interna de fondos P2P de forma atómica.
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void executeP2PTransfer(TransferP2PReqDTO dto) {
+        // 1. Control estricto de Idempotencia [RF-06]
+        validateIdempotency(dto.transactionUuid());
+
+        if (dto.sourceAccountNumber().equals(dto.destinationAccountNumber())) {
+            throw new IllegalArgumentException("La cuenta de origen y destino no pueden ser iguales");
+        }
+
+        // 2. Buscar y validar existencia de las cuentas
+        Account sourceAccount = accountRepository.findByAccountNumber(dto.sourceAccountNumber())
+                .orElseThrow(() -> new IllegalArgumentException("La cuenta de origen no existe"));
+        Account destAccount = accountRepository.findByAccountNumber(dto.destinationAccountNumber())
+                .orElseThrow(() -> new IllegalArgumentException("La cuenta de destino no existe"));
+
+        // 3. Validar Estados del Ciclo de Vida
+        if (!"ACTIVA".equals(sourceAccount.getStatus())) {
+            throw new IllegalStateException("La cuenta de origen no está activa");
+        }
+        if (!"ACTIVA".equals(destAccount.getStatus())) {
+            throw new IllegalStateException("La cuenta de destino no está activa");
+        }
+
+        // 4. Validar disponibilidad de fondos usando Saldo Disponible [RF-05]
+        if (sourceAccount.getAvailableBalance().compareTo(dto.amount()) < 0) {
+            throw new IllegalStateException("Fondos insuficientes en la cuenta de origen");
+        }
+
+        LocalDate accountingDate = calculateAccountingDate();
+
+        // 5. Afectar saldos de forma local (Débito a Origen)
+        sourceAccount.setAvailableBalance(sourceAccount.getAvailableBalance().subtract(dto.amount()));
+        sourceAccount.setAccountingBalance(sourceAccount.getAccountingBalance().subtract(dto.amount()));
+        accountRepository.save(sourceAccount);
+
+        // 6. Afectar saldos de forma local (Crédito a Destino)
+        destAccount.setAvailableBalance(destAccount.getAvailableBalance().add(dto.amount()));
+        destAccount.setAccountingBalance(destAccount.getAccountingBalance().add(dto.amount()));
+        accountRepository.save(destAccount);
+
+        // 7. Registrar ambos movimientos en el historial local (Data Caliente)
+        // Se guardarán automáticamente en la partición mensual correspondiente de PostgreSQL [RF-05]
+        AccountTransaction debitTx = createLocalTransaction(sourceAccount, dto.amount(), "DEBIT", "P2P_OUT", dto.transactionUuid(), accountingDate);
+        AccountTransaction creditTx = createLocalTransaction(destAccount, dto.amount(), "CREDIT", "P2P_IN", dto.transactionUuid(), accountingDate);
+        transactionRepository.save(debitTx);
+        transactionRepository.save(creditTx);
+
+        // 8. Construcción del Asiento Contable por Partida Doble para el servicio de Bryan
+        List<AccountingEntryReqDTO.JournalLineDTO> lines = List.of(
+                new AccountingEntryReqDTO.JournalLineDTO(getAccountClassCode(sourceAccount), "DEBIT", dto.amount(), "Envío Transferencia P2P"),
+                new AccountingEntryReqDTO.JournalLineDTO(getAccountClassCode(destAccount), "CREDIT", dto.amount(), "Recepción Transferencia P2P")
+        );
+
+        AccountingEntryReqDTO entry = new AccountingEntryReqDTO(
+                dto.transactionUuid(),
+                "Transferencia P2P interna ref: " + dto.sourceAccountNumber() + " -> " + dto.destinationAccountNumber(),
+                lines
+        );
+
+        // 9. Envío síncrono con Timeout de 5s. Si falla, dispara el reverso local inmediato.
+        accountingServiceClient.sendAccountingEntry(entry);
     }
 }
