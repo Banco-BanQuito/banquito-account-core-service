@@ -1,11 +1,18 @@
 package ec.edu.espe.banquito.accountcore.dto;
 
-import java.annotation.Nonnull;
+import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 
 public record CorporateDebitReqDTO(
-        @Nonnull String accountId,
-        @Nonnull BigDecimal totalAmount,
-        @Nonnull BigDecimal commissionAmount,
-        @Nonnull String transactionUuid
+        @NotNull(message = "El ID de la cuenta es obligatorio")
+        String accountId,
+
+        @NotNull(message = "El monto total es obligatorio")
+        BigDecimal totalAmount,
+
+        @NotNull(message = "El monto de la comisión es obligatorio")
+        BigDecimal commissionAmount,
+
+        @NotNull(message = "El UUID de la transacción es obligatorio")
+        String transactionUuid
 ) {}
