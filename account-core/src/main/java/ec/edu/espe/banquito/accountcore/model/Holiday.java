@@ -1,14 +1,14 @@
 package ec.edu.espe.banquito.accountcore.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
 import java.time.LocalDate;
 
 @Entity
 @Table(name = "holiday")
-@Data
-@NoArgsConstructor
+@Getter
+@Setter
 public class Holiday {
 
     @Id

@@ -2,35 +2,25 @@ package ec.edu.espe.banquito.accountcore.client;
 
 import ec.edu.espe.banquito.accountcore.dto.AccountingEntryReqDTO;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
-
-import java.time.Duration;
+import org.springframework.web.client.RestClient;
 
 @Component
 public class AccountingServiceClient {
 
-    private final WebClient webClient;
+    private final RestClient restClient;
 
     public AccountingServiceClient(
-            WebClient.Builder webClientBuilder,
-            @Value("${accounting.service.url:http://accounting-service:8082}") String accountingUrl) {
-        this.webClient = webClientBuilder.baseUrl(accountingUrl).build();
+            RestClient.Builder restClientBuilder,
+            @Value("${accounting.service.url:http://localhost:8082}") String accountingServiceUrl) {
+        this.restClient = restClientBuilder.baseUrl(accountingServiceUrl).build();
     }
 
-    public void sendAccountingEntry(AccountingEntryReqDTO entry) {
-        this.webClient.post()
+    public void registerEntry(AccountingEntryReqDTO request) {
+        restClient.post()
                 .uri("/api/v2/accounting/entries")
-                .bodyValue(entry)
+                .body(request)
                 .retrieve()
-                .onStatus(HttpStatusCode::isError, response ->
-                        response.bodyToMono(String.class)
-                                .flatMap(errorBody -> Mono.error(new RuntimeException("Error en contabilidad: " + errorBody)))
-                )
-                .toBodilessEntity()
-                .timeout(Duration.ofSeconds(5))
-                .block();
+                .toBodilessEntity();
     }
 }

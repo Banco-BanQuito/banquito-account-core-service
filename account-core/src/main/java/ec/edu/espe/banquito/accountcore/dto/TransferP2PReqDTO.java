@@ -2,19 +2,22 @@ package ec.edu.espe.banquito.accountcore.dto;
 
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+
 import java.math.BigDecimal;
 
 public record TransferP2PReqDTO(
-        @NotNull(message = "El número de cuenta de origen es obligatorio")
-        String sourceAccountNumber,
+        @NotNull(message = "Origin account ID is required")
+        Long originAccountId,
 
-        @NotNull(message = "El número de cuenta de destino es obligatorio")
+        @NotNull(message = "Destination account number is required")
         String destinationAccountNumber,
 
-        @NotNull(message = "El monto es obligatorio")
-        @Positive(message = "El monto debe ser mayor a cero")
+        @NotNull(message = "Amount is required")
+        @Positive(message = "Amount must be greater than zero")
         BigDecimal amount,
 
-        @NotNull(message = "El UUID de la transacción es obligatorio")
-        String transactionUuid
+        @NotNull(message = "Transaction UUID is required")
+        String transactionUuid,
+
+        String reference
 ) {}

@@ -1,18 +1,35 @@
 package ec.edu.espe.banquito.accountcore.controller;
 
+import ec.edu.espe.banquito.accountcore.dto.BalanceResponseDTO;
+import ec.edu.espe.banquito.accountcore.dto.HealthResponseDTO;
+import ec.edu.espe.banquito.accountcore.dto.OperationResponseDTO;
+import ec.edu.espe.banquito.accountcore.dto.TellerTransactionReqDTO;
+import ec.edu.espe.banquito.accountcore.dto.TransactionHistoryDTO;
 import ec.edu.espe.banquito.accountcore.dto.TransferP2PReqDTO;
+import ec.edu.espe.banquito.accountcore.dto.TransferResponseDTO;
+import ec.edu.espe.banquito.accountcore.exception.AccountNotFoundException;
 import ec.edu.espe.banquito.accountcore.repository.AccountRepository;
 import ec.edu.espe.banquito.accountcore.service.AccountTransactionService;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/v2/accounts")
 public class AccountController {
+
+    private static final String CURRENCY = "USD";
 
     private final AccountRepository accountRepository;
     private final AccountTransactionService transactionService;
@@ -22,40 +39,48 @@ public class AccountController {
         this.transactionService = transactionService;
     }
 
-    @GetMapping("/{accountNumber}/balance")
-    public ResponseEntity<?> getBalance(@PathVariable String accountNumber) {
-        return accountRepository.findByAccountNumber(accountNumber)
-                .map(acc -> ResponseEntity.ok(Map.of(
-                        "accountNumber", acc.getAccountNumber(),
-                        "availableBalance", acc.getAvailableBalance(),
-                        "accountingBalance", acc.getAccountingBalance(),
-                        "status", acc.getStatus()
+    @GetMapping("/{accountId}/balance")
+    public ResponseEntity<BalanceResponseDTO> getBalance(@PathVariable Long accountId) {
+        return accountRepository.findById(accountId)
+                .map(account -> ResponseEntity.ok(new BalanceResponseDTO(
+                        account.getId(),
+                        account.getAccountNumber(),
+                        account.getAvailableBalance(),
+                        account.getAccountingBalance(),
+                        account.getStatus(),
+                        CURRENCY
                 )))
-                .orElse(ResponseEntity.notFound().build());
+                .orElseThrow(() -> new AccountNotFoundException(accountId));
+    }
+
+    @GetMapping("/{accountId}/transactions")
+    public ResponseEntity<TransactionHistoryDTO> getTransactions(
+            @PathVariable Long accountId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        Pageable pageable = PageRequest.of(page, size);
+        return ResponseEntity.ok(transactionService.getTransactionHistory(accountId, from, to, pageable));
+    }
+
+    @PostMapping("/teller/deposit")
+    public ResponseEntity<OperationResponseDTO> tellerDeposit(@Valid @RequestBody TellerTransactionReqDTO request) {
+        return ResponseEntity.ok(transactionService.executeDeposit(request));
+    }
+
+    @PostMapping("/teller/withdrawal")
+    public ResponseEntity<OperationResponseDTO> tellerWithdrawal(@Valid @RequestBody TellerTransactionReqDTO request) {
+        return ResponseEntity.ok(transactionService.executeWithdrawal(request));
     }
 
     @PostMapping("/transfer/p2p")
-    public ResponseEntity<?> transferP2P(@Valid @RequestBody TransferP2PReqDTO dto) {
-        try {
-            transactionService.executeP2PTransfer(dto);
-            return ResponseEntity.ok(Map.of(
-                    "status", "SUCCESS",
-                    "message", "Transferencia interna realizada y registrada contablemente.",
-                    "uuid", dto.transactionUuid()
-            ));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getLocalizedMessage()));
-        } catch (IllegalStateException e) {
-            if ("TRANSACTION_UUID_DUPLICATED".equals(e.getMessage())) {
-                return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "Transacción rechazada por duplicidad (Idempotencia)."));
-            }
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getLocalizedMessage()));
-        } catch (Exception e) {
-            // Manejo estricto si falla el microservicio contable secundario [RF-01]
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
-                    "error", "La transferencia fue cancelada debido a una indisponibilidad en el libro mayor contable.",
-                    "details", e.getLocalizedMessage()
-            ));
-        }
+    public ResponseEntity<TransferResponseDTO> transferP2P(@Valid @RequestBody TransferP2PReqDTO request) {
+        return ResponseEntity.ok(transactionService.executeP2PTransfer(request));
+    }
+
+    @GetMapping("/health")
+    public ResponseEntity<HealthResponseDTO> health() {
+        return ResponseEntity.ok(new HealthResponseDTO("UP", "account-core-service", "2.0"));
     }
 }

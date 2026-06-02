@@ -1,13 +1,13 @@
 package ec.edu.espe.banquito.accountcore.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
 
 @Entity
 @Table(name = "core_parameter")
-@Data
-@NoArgsConstructor
+@Getter
+@Setter
 public class CoreParameter {
 
     @Id

@@ -1,18 +1,26 @@
 package ec.edu.espe.banquito.accountcore.dto;
 
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+
 import java.math.BigDecimal;
 
 public record TellerTransactionReqDTO(
-        @NotNull(message = "El número de cuenta es obligatorio")
-        String accountNumber,
+        @NotNull(message = "Account ID is required")
+        Long accountId,
 
-        @NotNull(message = "El monto es obligatorio")
+        @NotNull(message = "Amount is required")
+        @Positive(message = "Amount must be greater than zero")
         BigDecimal amount,
 
-        @NotNull(message = "El UUID de la transacción es obligatorio")
+        @NotNull(message = "Teller ID is required")
+        Long tellerId,
+
+        @NotNull(message = "Branch ID is required")
+        Long branchId,
+
+        @NotNull(message = "Transaction UUID is required")
         String transactionUuid,
 
-        @NotNull(message = "El ID del cajero es obligatorio")
-        String tellerId
+        String reference
 ) {}

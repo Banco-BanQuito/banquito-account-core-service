@@ -1,18 +1,26 @@
 package ec.edu.espe.banquito.accountcore.dto;
 
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
+
 import java.math.BigDecimal;
 
 public record CorporateDebitReqDTO(
-        @NotNull(message = "El ID de la cuenta es obligatorio")
-        String accountId,
+        @NotNull(message = "Account ID is required")
+        Long accountId,
 
-        @NotNull(message = "El monto total es obligatorio")
+        @NotNull(message = "Total amount is required")
+        @Positive(message = "Total amount must be greater than zero")
         BigDecimal totalAmount,
 
-        @NotNull(message = "El monto de la comisión es obligatorio")
+        @NotNull(message = "Commission amount is required")
+        @PositiveOrZero(message = "Commission amount must be zero or greater")
         BigDecimal commissionAmount,
 
-        @NotNull(message = "El UUID de la transacción es obligatorio")
+        @NotNull(message = "Batch ID is required")
+        String batchId,
+
+        @NotNull(message = "Transaction UUID is required")
         String transactionUuid
 ) {}

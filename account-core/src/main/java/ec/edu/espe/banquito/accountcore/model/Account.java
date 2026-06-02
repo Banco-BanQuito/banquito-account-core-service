@@ -1,15 +1,17 @@
 package ec.edu.espe.banquito.accountcore.model;
 
+import ec.edu.espe.banquito.accountcore.enums.AccountStatus;
+import ec.edu.espe.banquito.accountcore.enums.AccountType;
 import jakarta.persistence.*;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "account")
-@Data
-@NoArgsConstructor
+@Getter
+@Setter
 public class Account {
 
     @Id
@@ -23,7 +25,7 @@ public class Account {
     private String accountNumber;
 
     @Column(name = "account_type", nullable = false, length = 20)
-    private String accountType;
+    private AccountType accountType;
 
     @Column(name = "available_balance", precision = 15, scale = 2, nullable = false)
     private BigDecimal availableBalance;
@@ -32,7 +34,7 @@ public class Account {
     private BigDecimal accountingBalance;
 
     @Column(name = "status", nullable = false, length = 15)
-    private String status;
+    private AccountStatus status;
 
     @Column(name = "creation_date", nullable = false, updatable = false)
     private LocalDateTime creationDate;

@@ -1,16 +1,19 @@
 package ec.edu.espe.banquito.accountcore.model;
 
+import ec.edu.espe.banquito.accountcore.enums.TransactionSubtypeCode;
+import ec.edu.espe.banquito.accountcore.enums.TransactionStatus;
+import ec.edu.espe.banquito.accountcore.enums.TransactionType;
 import jakarta.persistence.*;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "account_transaction")
-@Data
-@NoArgsConstructor
+@Getter
+@Setter
 public class AccountTransaction {
 
     @Id
@@ -25,13 +28,22 @@ public class AccountTransaction {
     private String transactionUuid;
 
     @Column(name = "transaction_type", nullable = false, length = 15)
-    private String transactionType;
+    private TransactionType transactionType;
 
     @Column(name = "transaction_subtype", length = 30)
-    private String transactionSubtype;
+    private TransactionSubtypeCode transactionSubtype;
 
     @Column(name = "amount", precision = 15, scale = 2, nullable = false)
     private BigDecimal amount;
+
+    @Column(name = "resulting_balance", precision = 15, scale = 2, nullable = false)
+    private BigDecimal resultingBalance;
+
+    @Column(name = "description", length = 255)
+    private String description;
+
+    @Column(name = "status", nullable = false, length = 15)
+    private TransactionStatus status;
 
     @Column(name = "transaction_date", nullable = false)
     private LocalDateTime transactionDate;
