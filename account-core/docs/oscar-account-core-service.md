@@ -489,46 +489,16 @@ Oscar usa `GetCustomer` para validar que el cliente asociado a una cuenta este a
 
 Oscar usa `GetCustomerByAccount` para obtener el nombre del titular destino en transferencias P2P.
 
-## gRPC Expuesto Por Oscar
+## Comunicacion Con Switch
 
-Proto:
+Oscar no expone gRPC para Switch/Routing.
 
-`src/main/proto/account_core_service.proto`
+Si Switch necesita entregar o consumir informacion de Oscar, debe hacerlo por REST usando:
 
-Puerto configurable:
+- `POST /api/v2/payments/batch-credit`
+- `POST /api/v2/payments/corporate-debit`
 
-| Propiedad | Default |
-|---|---:|
-| `account-core.grpc.port` | `9091` |
-
-Servicio:
-
-```proto
-service AccountCoreService {
-  rpc BatchCredit(BatchCreditRequest) returns (BatchCreditResponse);
-  rpc CorporateDebit(CorporateDebitRequest) returns (CorporateDebitResponse);
-}
-```
-
-### AccountCoreService.BatchCredit
-
-Equivalente gRPC del endpoint REST:
-
-`POST /api/v2/payments/batch-credit`
-
-Consumidor esperado:
-
-- `routing-service`.
-
-### AccountCoreService.CorporateDebit
-
-Equivalente gRPC del endpoint REST:
-
-`POST /api/v2/payments/corporate-debit`
-
-Consumidor esperado:
-
-- `routing-service`.
+gRPC queda reservado para comunicacion interna entre servicios del core bancario, como contabilidad y party.
 
 ## Reglas De Negocio Principales
 
@@ -575,8 +545,24 @@ accounting.grpc.port=${ACCOUNTING_GRPC_PORT:9092}
 party.grpc.host=${PARTY_GRPC_HOST:localhost}
 party.grpc.port=${PARTY_GRPC_PORT:9093}
 
-account-core.grpc.port=${ACCOUNT_CORE_GRPC_PORT:9091}
+api.public.base-url=${API_PUBLIC_BASE_URL:/}
+springdoc.swagger-ui.path=/swagger-ui.html
+springdoc.api-docs.path=/v3/api-docs
 ```
+
+## OpenAPI Y Swagger
+
+Oscar publica documentacion OpenAPI para importar en un API Manager.
+
+URLs locales:
+
+| Uso | URL |
+|---|---|
+| Swagger UI | `http://localhost:8081/swagger-ui.html` |
+| OpenAPI JSON | `http://localhost:8081/v3/api-docs` |
+| OpenAPI YAML | `http://localhost:8081/v3/api-docs.yaml` |
+
+Para ambientes con API Manager o gateway, configurar `API_PUBLIC_BASE_URL` con la URL publica base que debe aparecer en el contrato OpenAPI.
 
 ## Errores Comunes
 
@@ -592,5 +578,5 @@ account-core.grpc.port=${ACCOUNT_CORE_GRPC_PORT:9091}
 - Usar `accountId` para operaciones sobre cuentas, excepto P2P destino, que usa `destinationAccountNumber`.
 - Usar un `transactionUuid` unico por intento de operacion.
 - No reintentar con el mismo `transactionUuid` si se quiere crear una nueva operacion.
-- Para operaciones internas Switch -> Core se recomienda usar gRPC `AccountCoreService`.
-- Para clientes externos o frontends se mantienen endpoints REST via Kong.
+- Para comunicacion Switch/Routing -> Oscar usar REST.
+- gRPC se usa solo para comunicacion interna entre servicios del core.
