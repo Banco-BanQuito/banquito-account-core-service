@@ -9,7 +9,13 @@ public class TransactionStatusConverter implements AttributeConverter<Transactio
 
     @Override
     public String convertToDatabaseColumn(TransactionStatus attribute) {
-        return attribute == null ? null : attribute.name();
+        if (attribute == null) {
+            return null;
+        }
+        return switch (attribute) {
+            case COMPLETED -> "COMPLETADA";
+            case REJECTED -> "RECHAZADA";
+        };
     }
 
     @Override

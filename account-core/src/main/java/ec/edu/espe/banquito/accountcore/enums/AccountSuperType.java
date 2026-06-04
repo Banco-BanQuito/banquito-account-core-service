@@ -1,17 +1,17 @@
 package ec.edu.espe.banquito.accountcore.enums;
 
-public enum AccountType {
+public enum AccountSuperType {
     SAVINGS,
     CHECKING;
 
-    public static AccountType fromDatabaseValue(String value) {
+    public static AccountSuperType fromDatabaseValue(String value) {
         if (value == null) {
             return null;
         }
         return switch (value) {
             case "AHORROS", "SAVINGS" -> SAVINGS;
             case "CORRIENTE", "CHECKING" -> CHECKING;
-            default -> AccountType.valueOf(value);
+            default -> AccountSuperType.valueOf(value);
         };
     }
 }

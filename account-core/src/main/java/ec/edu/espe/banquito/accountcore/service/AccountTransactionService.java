@@ -13,7 +13,7 @@ import ec.edu.espe.banquito.accountcore.dto.TransactionHistoryDTO;
 import ec.edu.espe.banquito.accountcore.dto.TransferP2PReqDTO;
 import ec.edu.espe.banquito.accountcore.dto.TransferResponseDTO;
 import ec.edu.espe.banquito.accountcore.enums.AccountStatus;
-import ec.edu.espe.banquito.accountcore.enums.AccountType;
+import ec.edu.espe.banquito.accountcore.enums.AccountSuperType;
 import ec.edu.espe.banquito.accountcore.enums.TransactionStatus;
 import ec.edu.espe.banquito.accountcore.enums.TransactionSubtypeCode;
 import ec.edu.espe.banquito.accountcore.enums.TransactionType;
@@ -23,8 +23,10 @@ import ec.edu.espe.banquito.accountcore.exception.InactiveAccountException;
 import ec.edu.espe.banquito.accountcore.exception.InsufficientBalanceException;
 import ec.edu.espe.banquito.accountcore.model.Account;
 import ec.edu.espe.banquito.accountcore.model.AccountTransaction;
+import ec.edu.espe.banquito.accountcore.model.TransactionSubtype;
 import ec.edu.espe.banquito.accountcore.repository.AccountRepository;
 import ec.edu.espe.banquito.accountcore.repository.AccountTransactionRepository;
+import ec.edu.espe.banquito.accountcore.repository.TransactionSubtypeRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -48,15 +50,18 @@ public class AccountTransactionService {
 
     private final AccountRepository accountRepository;
     private final AccountTransactionRepository transactionRepository;
+    private final TransactionSubtypeRepository transactionSubtypeRepository;
     private final AccountingServiceClient accountingServiceClient;
     private final PartyServiceClient partyServiceClient;
 
     public AccountTransactionService(AccountRepository accountRepository,
                                      AccountTransactionRepository transactionRepository,
+                                     TransactionSubtypeRepository transactionSubtypeRepository,
                                      AccountingServiceClient accountingServiceClient,
                                      PartyServiceClient partyServiceClient) {
         this.accountRepository = accountRepository;
         this.transactionRepository = transactionRepository;
+        this.transactionSubtypeRepository = transactionSubtypeRepository;
         this.accountingServiceClient = accountingServiceClient;
         this.partyServiceClient = partyServiceClient;
     }
@@ -70,7 +75,7 @@ public class AccountTransactionService {
         List<TransactionHistoryDTO.TransactionHistoryItemDTO> content = page.getContent().stream()
                 .map(transaction -> new TransactionHistoryDTO.TransactionHistoryItemDTO(
                         transaction.getTransactionUuid(),
-                        transaction.getTransactionType().name(),
+                        transaction.getMovementType().name(),
                         transaction.getAmount(),
                         transaction.getResultingBalance(),
                         transaction.getTransactionDate(),
@@ -366,8 +371,8 @@ public class AccountTransactionService {
         AccountTransaction transaction = new AccountTransaction();
         transaction.setAccount(account);
         transaction.setAmount(amount);
-        transaction.setTransactionType(transactionType);
-        transaction.setTransactionSubtype(transactionSubtype);
+        transaction.setMovementType(transactionType);
+        transaction.setTransactionSubtype(getTransactionSubtype(transactionSubtype));
         transaction.setTransactionUuid(transactionUuid);
         transaction.setTransactionDate(LocalDateTime.now());
         transaction.setAccountingDate(accountingDate);
@@ -395,7 +400,13 @@ public class AccountTransactionService {
     }
 
     private String getCustomerLiabilityAccountCode(Account account) {
-        return account.getAccountType() == AccountType.SAVINGS ? "2.1.0.01" : "2.1.0.02";
+        AccountSuperType superType = account.getAccountSubtype().getSuperType();
+        return superType == AccountSuperType.SAVINGS ? "2.1.0.01" : "2.1.0.02";
+    }
+
+    private TransactionSubtype getTransactionSubtype(TransactionSubtypeCode subtypeCode) {
+        return transactionSubtypeRepository.findByCode(subtypeCode.databaseCode())
+                .orElseThrow(() -> new IllegalStateException("Transaction subtype is not configured: " + subtypeCode.databaseCode()));
     }
 
     private String descriptionOrDefault(String description, String defaultDescription) {

@@ -9,7 +9,7 @@ public class TransactionSubtypeCodeConverter implements AttributeConverter<Trans
 
     @Override
     public String convertToDatabaseColumn(TransactionSubtypeCode attribute) {
-        return attribute == null ? null : attribute.name();
+        return attribute == null ? null : attribute.databaseCode();
     }
 
     @Override

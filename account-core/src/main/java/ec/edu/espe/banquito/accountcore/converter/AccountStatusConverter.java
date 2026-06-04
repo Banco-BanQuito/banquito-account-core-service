@@ -9,7 +9,15 @@ public class AccountStatusConverter implements AttributeConverter<AccountStatus,
 
     @Override
     public String convertToDatabaseColumn(AccountStatus attribute) {
-        return attribute == null ? null : attribute.name();
+        if (attribute == null) {
+            return null;
+        }
+        return switch (attribute) {
+            case ACTIVE -> "ACTIVA";
+            case INACTIVE -> "INACTIVA";
+            case BLOCKED -> "BLOQUEADA";
+            case SUSPENDED -> "SUSPENDIDA";
+        };
     }
 
     @Override

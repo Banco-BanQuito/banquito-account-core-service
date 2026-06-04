@@ -1,6 +1,5 @@
 package ec.edu.espe.banquito.accountcore.model;
 
-import ec.edu.espe.banquito.accountcore.enums.TransactionSubtypeCode;
 import ec.edu.espe.banquito.accountcore.enums.TransactionStatus;
 import ec.edu.espe.banquito.accountcore.enums.TransactionType;
 import jakarta.persistence.*;
@@ -21,17 +20,18 @@ public class AccountTransaction {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "account_id", nullable = false)
+    @JoinColumn(name = "account_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     private Account account;
 
     @Column(name = "transaction_uuid", nullable = false, length = 36)
     private String transactionUuid;
 
-    @Column(name = "transaction_type", nullable = false, length = 15)
-    private TransactionType transactionType;
+    @Column(name = "movement_type", nullable = false, length = 15)
+    private TransactionType movementType;
 
-    @Column(name = "transaction_subtype", length = 30)
-    private TransactionSubtypeCode transactionSubtype;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "transaction_subtype_id", foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    private TransactionSubtype transactionSubtype;
 
     @Column(name = "amount", precision = 15, scale = 2, nullable = false)
     private BigDecimal amount;
@@ -50,4 +50,8 @@ public class AccountTransaction {
 
     @Column(name = "accounting_date", nullable = false)
     private LocalDate accountingDate;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private Integer version;
 }

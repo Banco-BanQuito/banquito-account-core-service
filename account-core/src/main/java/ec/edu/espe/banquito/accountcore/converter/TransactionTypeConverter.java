@@ -9,11 +9,17 @@ public class TransactionTypeConverter implements AttributeConverter<TransactionT
 
     @Override
     public String convertToDatabaseColumn(TransactionType attribute) {
-        return attribute == null ? null : attribute.name();
+        if (attribute == null) {
+            return null;
+        }
+        return switch (attribute) {
+            case DEBIT -> "DEBITO";
+            case CREDIT -> "CREDITO";
+        };
     }
 
     @Override
     public TransactionType convertToEntityAttribute(String dbData) {
-        return dbData == null ? null : TransactionType.valueOf(dbData);
+        return TransactionType.fromDatabaseValue(dbData);
     }
 }
