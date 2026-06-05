@@ -489,6 +489,56 @@ Oscar usa `GetCustomer` para validar que el cliente asociado a una cuenta este a
 
 Oscar usa `GetCustomerByAccount` para obtener el nombre del titular destino en transferencias P2P.
 
+## gRPC Expuesto Por Oscar
+
+### AccountLookupService
+
+Este contrato es para comunicacion interna core-to-core. Por ejemplo, `party-service` puede usarlo para obtener el `customerId` a partir del numero de cuenta y luego resolver el titular en su propio dominio.
+
+Proto:
+
+`src/main/proto/account_lookup_service.proto`
+
+Puerto configurable:
+
+| Propiedad | Default |
+|---|---:|
+| `account-core.grpc.port` | `9091` |
+
+Servicio:
+
+```proto
+service AccountLookupService {
+  rpc GetAccountByNumber(GetAccountByNumberRequest) returns (AccountLookupResponse);
+}
+```
+
+Request:
+
+```json
+{
+  "accountNumber": "2200000002"
+}
+```
+
+Response:
+
+```json
+{
+  "accountId": 1,
+  "accountNumber": "2200000002",
+  "customerId": 2,
+  "status": "ACTIVA"
+}
+```
+
+Errores gRPC:
+
+| Status | Caso |
+|---|---|
+| `INVALID_ARGUMENT` | Numero de cuenta vacio. |
+| `NOT_FOUND` | Cuenta no encontrada. |
+
 ## Comunicacion Con Switch
 
 Oscar no expone gRPC para Switch/Routing.
@@ -544,6 +594,8 @@ accounting.grpc.port=${ACCOUNTING_GRPC_PORT:9092}
 
 party.grpc.host=${PARTY_GRPC_HOST:localhost}
 party.grpc.port=${PARTY_GRPC_PORT:9093}
+
+account-core.grpc.port=${ACCOUNT_CORE_GRPC_PORT:9091}
 
 api.public.base-url=${API_PUBLIC_BASE_URL:/}
 springdoc.swagger-ui.path=/swagger-ui.html
