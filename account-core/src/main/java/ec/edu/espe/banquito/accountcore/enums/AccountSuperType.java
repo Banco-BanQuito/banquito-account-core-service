@@ -9,7 +9,7 @@ public enum AccountSuperType {
             return null;
         }
         return switch (value) {
-            case "AHORROS", "SAVINGS" -> SAVINGS;
+            case "AHORRO", "AHORROS", "SAVINGS" -> SAVINGS;
             case "CORRIENTE", "CHECKING" -> CHECKING;
             default -> AccountSuperType.valueOf(value);
         };

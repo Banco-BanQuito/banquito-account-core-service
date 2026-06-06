@@ -19,7 +19,7 @@ public class AccountSubtype {
     @Column(name = "super_type", nullable = false, length = 15)
     private AccountSuperType superType;
 
-    @Column(name = "code", nullable = false, unique = true, length = 10)
+    @Column(name = "code", nullable = false, unique = true, length = 30)
     private String code;
 
     @Column(name = "name", nullable = false, length = 50)
