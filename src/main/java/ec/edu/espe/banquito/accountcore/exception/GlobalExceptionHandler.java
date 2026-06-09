@@ -18,6 +18,12 @@ public class GlobalExceptionHandler {
                 .body(Map.of("error", exception.getMessage()));
     }
 
+    @ExceptionHandler(FavoriteAccountNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleFavoriteAccountNotFound(FavoriteAccountNotFoundException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", exception.getMessage()));
+    }
+
     @ExceptionHandler(DuplicateTransactionException.class)
     public ResponseEntity<Map<String, String>> handleDuplicateTransaction(DuplicateTransactionException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)

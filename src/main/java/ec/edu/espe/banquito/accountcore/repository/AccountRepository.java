@@ -12,6 +12,8 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
 
     List<Account> findByCustomerIdOrderByAccountNumberAsc(Long customerId);
 
+    Optional<Account> findFirstByCustomerIdAndFavoriteTrueOrderByAccountNumberAsc(Long customerId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Account> findWithLockByAccountNumber(String accountNumber);
 

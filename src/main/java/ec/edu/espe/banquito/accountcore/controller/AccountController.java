@@ -2,6 +2,7 @@ package ec.edu.espe.banquito.accountcore.controller;
 
 import ec.edu.espe.banquito.accountcore.dto.AccountSummaryResponseDTO;
 import ec.edu.espe.banquito.accountcore.dto.BalanceResponseDTO;
+import ec.edu.espe.banquito.accountcore.dto.FavoriteAccountResponseDTO;
 import ec.edu.espe.banquito.accountcore.dto.HealthResponseDTO;
 import ec.edu.espe.banquito.accountcore.dto.OperationResponseDTO;
 import ec.edu.espe.banquito.accountcore.dto.TellerTransactionReqDTO;
@@ -10,6 +11,7 @@ import ec.edu.espe.banquito.accountcore.dto.TransferP2PReqDTO;
 import ec.edu.espe.banquito.accountcore.dto.TransferResponseDTO;
 import ec.edu.espe.banquito.accountcore.exception.AccountNotFoundException;
 import ec.edu.espe.banquito.accountcore.repository.AccountRepository;
+import ec.edu.espe.banquito.accountcore.service.AccountQueryService;
 import ec.edu.espe.banquito.accountcore.service.AccountTransactionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -42,10 +44,15 @@ public class AccountController {
     private static final String CURRENCY = "USD";
 
     private final AccountRepository accountRepository;
+    private final AccountQueryService accountQueryService;
     private final AccountTransactionService transactionService;
 
-    public AccountController(AccountRepository accountRepository, AccountTransactionService transactionService) {
+    public AccountController(
+            AccountRepository accountRepository,
+            AccountQueryService accountQueryService,
+            AccountTransactionService transactionService) {
         this.accountRepository = accountRepository;
+        this.accountQueryService = accountQueryService;
         this.transactionService = transactionService;
     }
 
@@ -67,6 +74,20 @@ public class AccountController {
                 ))
                 .toList();
         return ResponseEntity.ok(accounts);
+    }
+
+    @GetMapping("/customer/{customerId}/favorite")
+    @Operation(summary = "Get favorite account", description = "Returns the account marked as favorite for a customer.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Favorite account returned",
+                    content = @Content(schema = @Schema(implementation = FavoriteAccountResponseDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid customer identifier"),
+            @ApiResponse(responseCode = "404", description = "Favorite account not found")
+    })
+    public ResponseEntity<FavoriteAccountResponseDTO> getFavoriteAccount(
+            @Parameter(description = "Customer identifier managed by party-service", example = "2")
+            @PathVariable Long customerId) {
+        return ResponseEntity.ok(accountQueryService.getFavoriteAccount(customerId));
     }
 
     @GetMapping("/{accountId}/balance")
