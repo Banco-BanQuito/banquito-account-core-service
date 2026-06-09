@@ -230,7 +230,7 @@ public class AccountTransactionService {
         for (BatchCreditReqDTO.CreditItemDTO creditItem : request.credits()) {
             validateIdempotency(creditItem.transactionUuid());
 
-            Account account = getAccountForUpdate(creditItem.accountId());
+            Account account = getAccountForUpdate(creditItem.accountNumber());
             validateActiveAccount(account);
             partyServiceClient.validateActiveCustomer(account.getCustomerId());
 
@@ -260,7 +260,7 @@ public class AccountTransactionService {
             ));
 
             results.add(new BatchCreditResponseDTO.BatchCreditResultDTO(
-                    creditItem.accountId(),
+                    creditItem.accountNumber(),
                     "SUCCESS",
                     creditItem.transactionUuid()
             ));
@@ -273,7 +273,7 @@ public class AccountTransactionService {
     public CorporateDebitResponseDTO executeCorporateDebit(CorporateDebitReqDTO request) {
         validateIdempotency(request.transactionUuid());
 
-        Account account = getAccountForUpdate(request.accountId());
+        Account account = getAccountForUpdate(request.accountNumber());
         validateActiveAccount(account);
         partyServiceClient.validateActiveCustomer(account.getCustomerId());
 

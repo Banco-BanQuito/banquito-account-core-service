@@ -9,7 +9,7 @@ public record BatchCreditResponseDTO(
         List<BatchCreditResultDTO> results
 ) {
     public record BatchCreditResultDTO(
-            Long accountId,
+            String accountNumber,
             String status,
             String transactionId
     ) {}
