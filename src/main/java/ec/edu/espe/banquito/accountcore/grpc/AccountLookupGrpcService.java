@@ -1,6 +1,5 @@
 package ec.edu.espe.banquito.accountcore.grpc;
 
-import ec.edu.espe.banquito.accountcore.enums.AccountStatus;
 import ec.edu.espe.banquito.accountcore.exception.AccountNotFoundException;
 import ec.edu.espe.banquito.accountcore.grpc.accountlookup.AccountLookupResponse;
 import ec.edu.espe.banquito.accountcore.grpc.accountlookup.AccountLookupServiceGrpc;
@@ -38,7 +37,7 @@ public class AccountLookupGrpcService extends AccountLookupServiceGrpc.AccountLo
                     .setAccountId(account.getId())
                     .setAccountNumber(account.getAccountNumber())
                     .setCustomerId(account.getCustomerId())
-                    .setStatus(toLegacyStatus(account.getStatus()))
+                    .setStatus(account.getStatus().name())
                     .build());
             responseObserver.onCompleted();
         } catch (AccountNotFoundException exception) {
@@ -48,12 +47,4 @@ public class AccountLookupGrpcService extends AccountLookupServiceGrpc.AccountLo
         }
     }
 
-    private String toLegacyStatus(AccountStatus status) {
-        return switch (status) {
-            case ACTIVE -> "ACTIVA";
-            case INACTIVE -> "INACTIVA";
-            case BLOCKED -> "BLOQUEADA";
-            case SUSPENDED -> "SUSPENDIDA";
-        };
-    }
 }

@@ -17,6 +17,7 @@ public class AccountSubtype {
     private Integer id;
 
     @Column(name = "super_type", nullable = false, length = 15)
+    @Enumerated(EnumType.STRING)
     private AccountSuperType superType;
 
     @Column(name = "code", nullable = false, unique = true, length = 30)
@@ -29,6 +30,7 @@ public class AccountSubtype {
     private String description;
 
     @Column(name = "status", nullable = false, length = 15)
+    @Enumerated(EnumType.STRING)
     private CatalogStatus status;
 
     @Column(name = "observations", length = 255)

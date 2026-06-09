@@ -38,6 +38,7 @@ public class Account {
     private BigDecimal accountingBalance;
 
     @Column(name = "status", nullable = false, length = 15)
+    @Enumerated(EnumType.STRING)
     private AccountStatus status;
 
     @Column(name = "is_favorite", nullable = false)

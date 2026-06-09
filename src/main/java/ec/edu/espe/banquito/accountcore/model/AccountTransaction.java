@@ -27,6 +27,7 @@ public class AccountTransaction {
     private String transactionUuid;
 
     @Column(name = "movement_type", nullable = false, length = 15)
+    @Enumerated(EnumType.STRING)
     private TransactionType movementType;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -43,6 +44,7 @@ public class AccountTransaction {
     private String description;
 
     @Column(name = "status", nullable = false, length = 15)
+    @Enumerated(EnumType.STRING)
     private TransactionStatus status;
 
     @Column(name = "transaction_date", nullable = false)

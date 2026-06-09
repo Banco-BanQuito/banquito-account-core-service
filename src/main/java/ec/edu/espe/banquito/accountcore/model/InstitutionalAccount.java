@@ -26,6 +26,7 @@ public class InstitutionalAccount {
     private BigDecimal accountingBalance;
 
     @Column(name = "status", nullable = false, length = 15)
+    @Enumerated(EnumType.STRING)
     private CatalogStatus status;
 
     @Column(name = "creation_date", nullable = false)

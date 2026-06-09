@@ -101,8 +101,8 @@ public class AccountTransactionService {
         AccountTransaction transaction = transactionRepository.save(createTransaction(
                 account,
                 request.amount(),
-                TransactionType.CREDIT,
-                TransactionSubtypeCode.TELLER_DEPOSIT,
+                TransactionType.CREDITO,
+                TransactionSubtypeCode.DEP_VEN,
                 request.transactionUuid(),
                 accountingDate,
                 account.getAvailableBalance(),
@@ -114,8 +114,8 @@ public class AccountTransactionService {
                 "Teller deposit account " + account.getId(),
                 accountingDate,
                 List.of(
-                        journalLine(VAULT_ACCOUNT_CODE, TransactionType.DEBIT, request.amount(), request.transactionUuid()),
-                        journalLine(getCustomerLiabilityAccountCode(account), TransactionType.CREDIT, request.amount(), request.transactionUuid())
+                        journalLine(VAULT_ACCOUNT_CODE, TransactionType.DEBITO, request.amount(), request.transactionUuid()),
+                        journalLine(getCustomerLiabilityAccountCode(account), TransactionType.CREDITO, request.amount(), request.transactionUuid())
                 )
         ));
 
@@ -138,8 +138,8 @@ public class AccountTransactionService {
         AccountTransaction transaction = transactionRepository.save(createTransaction(
                 account,
                 request.amount(),
-                TransactionType.DEBIT,
-                TransactionSubtypeCode.TELLER_WITHDRAWAL,
+                TransactionType.DEBITO,
+                TransactionSubtypeCode.RET_VEN,
                 request.transactionUuid(),
                 accountingDate,
                 account.getAvailableBalance(),
@@ -151,8 +151,8 @@ public class AccountTransactionService {
                 "Teller withdrawal account " + account.getId(),
                 accountingDate,
                 List.of(
-                        journalLine(getCustomerLiabilityAccountCode(account), TransactionType.DEBIT, request.amount(), request.transactionUuid()),
-                        journalLine(VAULT_ACCOUNT_CODE, TransactionType.CREDIT, request.amount(), request.transactionUuid())
+                        journalLine(getCustomerLiabilityAccountCode(account), TransactionType.DEBITO, request.amount(), request.transactionUuid()),
+                        journalLine(VAULT_ACCOUNT_CODE, TransactionType.CREDITO, request.amount(), request.transactionUuid())
                 )
         ));
 
@@ -185,8 +185,8 @@ public class AccountTransactionService {
         AccountTransaction debitTransaction = transactionRepository.save(createTransaction(
                 sourceAccount,
                 request.amount(),
-                TransactionType.DEBIT,
-                TransactionSubtypeCode.P2P_OUT,
+                TransactionType.DEBITO,
+                TransactionSubtypeCode.TRF_P2P_S,
                 request.transactionUuid(),
                 accountingDate,
                 sourceAccount.getAvailableBalance(),
@@ -195,8 +195,8 @@ public class AccountTransactionService {
         transactionRepository.save(createTransaction(
                 destinationAccount,
                 request.amount(),
-                TransactionType.CREDIT,
-                TransactionSubtypeCode.P2P_IN,
+                TransactionType.CREDITO,
+                TransactionSubtypeCode.TRF_P2P_E,
                 request.transactionUuid(),
                 accountingDate,
                 destinationAccount.getAvailableBalance(),
@@ -208,8 +208,8 @@ public class AccountTransactionService {
                 "Internal P2P transfer " + sourceAccount.getAccountNumber() + " to " + destinationAccount.getAccountNumber(),
                 accountingDate,
                 List.of(
-                        journalLine(getCustomerLiabilityAccountCode(sourceAccount), TransactionType.DEBIT, request.amount(), request.transactionUuid()),
-                        journalLine(getCustomerLiabilityAccountCode(destinationAccount), TransactionType.CREDIT, request.amount(), request.transactionUuid())
+                        journalLine(getCustomerLiabilityAccountCode(sourceAccount), TransactionType.DEBITO, request.amount(), request.transactionUuid()),
+                        journalLine(getCustomerLiabilityAccountCode(destinationAccount), TransactionType.CREDITO, request.amount(), request.transactionUuid())
                 )
         ));
 
@@ -241,8 +241,8 @@ public class AccountTransactionService {
             transactionRepository.save(createTransaction(
                     account,
                     creditItem.amount(),
-                    TransactionType.CREDIT,
-                    TransactionSubtypeCode.BATCH_CREDIT,
+                    TransactionType.CREDITO,
+                    TransactionSubtypeCode.PAG_NOM_C,
                     creditItem.transactionUuid(),
                     accountingDate,
                     account.getAvailableBalance(),
@@ -254,8 +254,8 @@ public class AccountTransactionService {
                     "Batch credit " + request.batchId() + " account " + account.getId(),
                     accountingDate,
                     List.of(
-                            journalLine(PAYMENT_CLEARING_ACCOUNT_CODE, TransactionType.DEBIT, creditItem.amount(), request.batchId()),
-                            journalLine(getCustomerLiabilityAccountCode(account), TransactionType.CREDIT, creditItem.amount(), creditItem.transactionUuid())
+                            journalLine(PAYMENT_CLEARING_ACCOUNT_CODE, TransactionType.DEBITO, creditItem.amount(), request.batchId()),
+                            journalLine(getCustomerLiabilityAccountCode(account), TransactionType.CREDITO, creditItem.amount(), creditItem.transactionUuid())
                     )
             ));
 
@@ -291,8 +291,8 @@ public class AccountTransactionService {
         AccountTransaction transaction = transactionRepository.save(createTransaction(
                 account,
                 debitedAmount,
-                TransactionType.DEBIT,
-                TransactionSubtypeCode.CORPORATE_DEBIT,
+                TransactionType.DEBITO,
+                TransactionSubtypeCode.DEB_EMP,
                 request.transactionUuid(),
                 accountingDate,
                 account.getAvailableBalance(),
@@ -304,10 +304,10 @@ public class AccountTransactionService {
                 "Corporate debit batch " + request.batchId(),
                 accountingDate,
                 List.of(
-                        journalLine(getCustomerLiabilityAccountCode(account), TransactionType.DEBIT, debitedAmount, request.transactionUuid()),
-                        journalLine(PAYMENT_CLEARING_ACCOUNT_CODE, TransactionType.CREDIT, request.totalAmount(), request.batchId()),
-                        journalLine(SERVICE_INCOME_ACCOUNT_CODE, TransactionType.CREDIT, commissionNet, request.transactionUuid()),
-                        journalLine(VAT_PAYABLE_ACCOUNT_CODE, TransactionType.CREDIT, ivaAmount, request.transactionUuid())
+                        journalLine(getCustomerLiabilityAccountCode(account), TransactionType.DEBITO, debitedAmount, request.transactionUuid()),
+                        journalLine(PAYMENT_CLEARING_ACCOUNT_CODE, TransactionType.CREDITO, request.totalAmount(), request.batchId()),
+                        journalLine(SERVICE_INCOME_ACCOUNT_CODE, TransactionType.CREDITO, commissionNet, request.transactionUuid()),
+                        journalLine(VAT_PAYABLE_ACCOUNT_CODE, TransactionType.CREDITO, ivaAmount, request.transactionUuid())
                 )
         ));
 
@@ -339,7 +339,7 @@ public class AccountTransactionService {
     }
 
     private void validateActiveAccount(Account account) {
-        if (account.getStatus() != AccountStatus.ACTIVE) {
+        if (account.getStatus() != AccountStatus.ACTIVA) {
             throw new InactiveAccountException(account.getAccountNumber());
         }
     }
@@ -377,7 +377,7 @@ public class AccountTransactionService {
         transaction.setTransactionDate(LocalDateTime.now());
         transaction.setAccountingDate(accountingDate);
         transaction.setResultingBalance(resultingBalance);
-        transaction.setStatus(TransactionStatus.COMPLETED);
+        transaction.setStatus(TransactionStatus.COMPLETADA);
         transaction.setDescription(description);
         return transaction;
     }
@@ -401,15 +401,16 @@ public class AccountTransactionService {
 
     private String getCustomerLiabilityAccountCode(Account account) {
         AccountSuperType superType = account.getAccountSubtype().getSuperType();
-        return superType == AccountSuperType.SAVINGS ? "2.1.0.01" : "2.1.0.02";
+        return superType == AccountSuperType.AHORROS ? "2.1.0.01" : "2.1.0.02";
     }
 
     private TransactionSubtype getTransactionSubtype(TransactionSubtypeCode subtypeCode) {
-        return transactionSubtypeRepository.findByCode(subtypeCode.databaseCode())
-                .orElseThrow(() -> new IllegalStateException("Transaction subtype is not configured: " + subtypeCode.databaseCode()));
+        return transactionSubtypeRepository.findByCode(subtypeCode.name())
+                .orElseThrow(() -> new IllegalStateException("Transaction subtype is not configured: " + subtypeCode.name()));
     }
 
     private String descriptionOrDefault(String description, String defaultDescription) {
         return description == null || description.isBlank() ? defaultDescription : description;
     }
 }
+
