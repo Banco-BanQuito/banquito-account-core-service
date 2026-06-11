@@ -100,13 +100,15 @@ public class AccountTransactionService {
         LocalDate accountingDate = LocalDate.now();
         AccountTransaction transaction = transactionRepository.save(createTransaction(
                 account,
-                request.amount(),
-                TransactionType.CREDITO,
-                TransactionSubtypeCode.DEP_VEN,
-                request.transactionUuid(),
-                accountingDate,
-                account.getAvailableBalance(),
-                descriptionOrDefault(request.reference(), "Teller deposit")
+                new TransactionCreationData(
+                        request.amount(),
+                        TransactionType.CREDITO,
+                        TransactionSubtypeCode.DEP_VEN,
+                        request.transactionUuid(),
+                        accountingDate,
+                        account.getAvailableBalance(),
+                        descriptionOrDefault(request.reference(), "Teller deposit")
+                )
         ));
 
         accountingServiceClient.registerEntry(new AccountingEntryReqDTO(
@@ -137,13 +139,15 @@ public class AccountTransactionService {
         LocalDate accountingDate = LocalDate.now();
         AccountTransaction transaction = transactionRepository.save(createTransaction(
                 account,
-                request.amount(),
-                TransactionType.DEBITO,
-                TransactionSubtypeCode.RET_VEN,
-                request.transactionUuid(),
-                accountingDate,
-                account.getAvailableBalance(),
-                descriptionOrDefault(request.reference(), "Teller withdrawal")
+                new TransactionCreationData(
+                        request.amount(),
+                        TransactionType.DEBITO,
+                        TransactionSubtypeCode.RET_VEN,
+                        request.transactionUuid(),
+                        accountingDate,
+                        account.getAvailableBalance(),
+                        descriptionOrDefault(request.reference(), "Teller withdrawal")
+                )
         ));
 
         accountingServiceClient.registerEntry(new AccountingEntryReqDTO(
@@ -184,23 +188,27 @@ public class AccountTransactionService {
         LocalDate accountingDate = LocalDate.now();
         AccountTransaction debitTransaction = transactionRepository.save(createTransaction(
                 sourceAccount,
-                request.amount(),
-                TransactionType.DEBITO,
-                TransactionSubtypeCode.TRF_P2P_S,
-                request.transactionUuid(),
-                accountingDate,
-                sourceAccount.getAvailableBalance(),
-                descriptionOrDefault(request.reference(), "Internal P2P transfer sent")
+                new TransactionCreationData(
+                        request.amount(),
+                        TransactionType.DEBITO,
+                        TransactionSubtypeCode.TRF_P2P_S,
+                        request.transactionUuid(),
+                        accountingDate,
+                        sourceAccount.getAvailableBalance(),
+                        descriptionOrDefault(request.reference(), "Internal P2P transfer sent")
+                )
         ));
         transactionRepository.save(createTransaction(
                 destinationAccount,
-                request.amount(),
-                TransactionType.CREDITO,
-                TransactionSubtypeCode.TRF_P2P_E,
-                request.transactionUuid(),
-                accountingDate,
-                destinationAccount.getAvailableBalance(),
-                descriptionOrDefault(request.reference(), "Internal P2P transfer received")
+                new TransactionCreationData(
+                        request.amount(),
+                        TransactionType.CREDITO,
+                        TransactionSubtypeCode.TRF_P2P_E,
+                        request.transactionUuid(),
+                        accountingDate,
+                        destinationAccount.getAvailableBalance(),
+                        descriptionOrDefault(request.reference(), "Internal P2P transfer received")
+                )
         ));
 
         accountingServiceClient.registerEntry(new AccountingEntryReqDTO(
@@ -240,13 +248,15 @@ public class AccountTransactionService {
             LocalDate accountingDate = LocalDate.now();
             transactionRepository.save(createTransaction(
                     account,
-                    creditItem.amount(),
-                    TransactionType.CREDITO,
-                    TransactionSubtypeCode.PAG_NOM_C,
-                    creditItem.transactionUuid(),
-                    accountingDate,
-                    account.getAvailableBalance(),
-                    descriptionOrDefault(creditItem.reference(), "Batch credit " + request.batchId())
+                    new TransactionCreationData(
+                            creditItem.amount(),
+                            TransactionType.CREDITO,
+                            TransactionSubtypeCode.PAG_NOM_C,
+                            creditItem.transactionUuid(),
+                            accountingDate,
+                            account.getAvailableBalance(),
+                            descriptionOrDefault(creditItem.reference(), "Batch credit " + request.batchId())
+                    )
             ));
 
             accountingServiceClient.registerEntry(new AccountingEntryReqDTO(
@@ -290,13 +300,15 @@ public class AccountTransactionService {
         LocalDate accountingDate = LocalDate.now();
         AccountTransaction transaction = transactionRepository.save(createTransaction(
                 account,
-                debitedAmount,
-                TransactionType.DEBITO,
-                TransactionSubtypeCode.DEB_EMP,
-                request.transactionUuid(),
-                accountingDate,
-                account.getAvailableBalance(),
-                "Corporate debit batch " + request.batchId()
+                new TransactionCreationData(
+                        debitedAmount,
+                        TransactionType.DEBITO,
+                        TransactionSubtypeCode.DEB_EMP,
+                        request.transactionUuid(),
+                        accountingDate,
+                        account.getAvailableBalance(),
+                        "Corporate debit batch " + request.batchId()
+                )
         ));
 
         accountingServiceClient.registerEntry(new AccountingEntryReqDTO(
@@ -360,25 +372,18 @@ public class AccountTransactionService {
         account.setAccountingBalance(account.getAccountingBalance().add(amount));
     }
 
-    private AccountTransaction createTransaction(Account account,
-                                                 BigDecimal amount,
-                                                 TransactionType transactionType,
-                                                 TransactionSubtypeCode transactionSubtype,
-                                                 String transactionUuid,
-                                                 LocalDate accountingDate,
-                                                 BigDecimal resultingBalance,
-                                                 String description) {
+    private AccountTransaction createTransaction(Account account, TransactionCreationData data) {
         AccountTransaction transaction = new AccountTransaction();
         transaction.setAccount(account);
-        transaction.setAmount(amount);
-        transaction.setMovementType(transactionType);
-        transaction.setTransactionSubtype(getTransactionSubtype(transactionSubtype));
-        transaction.setTransactionUuid(transactionUuid);
+        transaction.setAmount(data.amount());
+        transaction.setMovementType(data.transactionType());
+        transaction.setTransactionSubtype(getTransactionSubtype(data.transactionSubtype()));
+        transaction.setTransactionUuid(data.transactionUuid());
         transaction.setTransactionDate(LocalDateTime.now());
-        transaction.setAccountingDate(accountingDate);
-        transaction.setResultingBalance(resultingBalance);
+        transaction.setAccountingDate(data.accountingDate());
+        transaction.setResultingBalance(data.resultingBalance());
         transaction.setStatus(TransactionStatus.COMPLETADA);
-        transaction.setDescription(description);
+        transaction.setDescription(data.description());
         return transaction;
     }
 
@@ -412,5 +417,15 @@ public class AccountTransactionService {
     private String descriptionOrDefault(String description, String defaultDescription) {
         return description == null || description.isBlank() ? defaultDescription : description;
     }
+
+    private record TransactionCreationData(
+            BigDecimal amount,
+            TransactionType transactionType,
+            TransactionSubtypeCode transactionSubtype,
+            String transactionUuid,
+            LocalDate accountingDate,
+            BigDecimal resultingBalance,
+            String description
+    ) {}
 }
 

@@ -7,7 +7,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -29,12 +28,10 @@ public class AuthController {
 
     @PostMapping("/login/staff")
     @Operation(summary = "Login staff user", description = "Authenticates an active teller from CORE_USER.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Staff authenticated",
-                    content = @Content(schema = @Schema(implementation = StaffLoginResponseDTO.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid request"),
-            @ApiResponse(responseCode = "401", description = "Invalid credentials or inactive/non-teller user")
-    })
+    @ApiResponse(responseCode = "200", description = "Staff authenticated",
+            content = @Content(schema = @Schema(implementation = StaffLoginResponseDTO.class)))
+    @ApiResponse(responseCode = "400", description = "Invalid request")
+    @ApiResponse(responseCode = "401", description = "Invalid credentials or inactive/non-teller user")
     public ResponseEntity<StaffLoginResponseDTO> loginStaff(@Valid @RequestBody StaffLoginRequestDTO request) {
         return ResponseEntity.ok(coreUserAuthService.loginStaff(request));
     }

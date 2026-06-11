@@ -18,7 +18,6 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.PageRequest;
@@ -78,12 +77,10 @@ public class AccountController {
 
     @GetMapping("/customer/{customerId}/favorite")
     @Operation(summary = "Get favorite account", description = "Returns the account marked as favorite for a customer.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Favorite account returned",
-                    content = @Content(schema = @Schema(implementation = FavoriteAccountResponseDTO.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid customer identifier"),
-            @ApiResponse(responseCode = "404", description = "Favorite account not found")
-    })
+    @ApiResponse(responseCode = "200", description = "Favorite account returned",
+            content = @Content(schema = @Schema(implementation = FavoriteAccountResponseDTO.class)))
+    @ApiResponse(responseCode = "400", description = "Invalid customer identifier")
+    @ApiResponse(responseCode = "404", description = "Favorite account not found")
     public ResponseEntity<FavoriteAccountResponseDTO> getFavoriteAccount(
             @Parameter(description = "Customer identifier managed by party-service", example = "2")
             @PathVariable Long customerId) {
@@ -92,11 +89,9 @@ public class AccountController {
 
     @GetMapping("/{accountId}/balance")
     @Operation(summary = "Get account balance", description = "Returns available and accounting balances for an account.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Balance returned",
-                    content = @Content(schema = @Schema(implementation = BalanceResponseDTO.class))),
-            @ApiResponse(responseCode = "404", description = "Account not found")
-    })
+    @ApiResponse(responseCode = "200", description = "Balance returned",
+            content = @Content(schema = @Schema(implementation = BalanceResponseDTO.class)))
+    @ApiResponse(responseCode = "404", description = "Account not found")
     public ResponseEntity<BalanceResponseDTO> getBalance(
             @Parameter(description = "Internal account identifier", example = "1")
             @PathVariable Long accountId) {
@@ -114,11 +109,9 @@ public class AccountController {
 
     @GetMapping("/{accountId}/transactions")
     @Operation(summary = "Get account transaction history", description = "Returns paginated transaction history filtered by accounting date.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Transaction history returned",
-                    content = @Content(schema = @Schema(implementation = TransactionHistoryDTO.class))),
-            @ApiResponse(responseCode = "404", description = "Account not found")
-    })
+    @ApiResponse(responseCode = "200", description = "Transaction history returned",
+            content = @Content(schema = @Schema(implementation = TransactionHistoryDTO.class)))
+    @ApiResponse(responseCode = "404", description = "Account not found")
     public ResponseEntity<TransactionHistoryDTO> getTransactions(
             @Parameter(description = "Internal account identifier", example = "1")
             @PathVariable Long accountId,
@@ -136,42 +129,36 @@ public class AccountController {
 
     @PostMapping("/teller/deposit")
     @Operation(summary = "Register teller deposit", description = "Credits an active account through a teller deposit operation.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Deposit registered",
-                    content = @Content(schema = @Schema(implementation = OperationResponseDTO.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid request or inactive account"),
-            @ApiResponse(responseCode = "404", description = "Account not found"),
-            @ApiResponse(responseCode = "409", description = "Duplicated transaction UUID"),
-            @ApiResponse(responseCode = "503", description = "Required core gRPC service unavailable")
-    })
+    @ApiResponse(responseCode = "200", description = "Deposit registered",
+            content = @Content(schema = @Schema(implementation = OperationResponseDTO.class)))
+    @ApiResponse(responseCode = "400", description = "Invalid request or inactive account")
+    @ApiResponse(responseCode = "404", description = "Account not found")
+    @ApiResponse(responseCode = "409", description = "Duplicated transaction UUID")
+    @ApiResponse(responseCode = "503", description = "Required core gRPC service unavailable")
     public ResponseEntity<OperationResponseDTO> tellerDeposit(@Valid @RequestBody TellerTransactionReqDTO request) {
         return ResponseEntity.ok(transactionService.executeDeposit(request));
     }
 
     @PostMapping("/teller/withdrawal")
     @Operation(summary = "Register teller withdrawal", description = "Debits an active account through a teller withdrawal operation.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Withdrawal registered",
-                    content = @Content(schema = @Schema(implementation = OperationResponseDTO.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid request, inactive account or insufficient balance"),
-            @ApiResponse(responseCode = "404", description = "Account not found"),
-            @ApiResponse(responseCode = "409", description = "Duplicated transaction UUID"),
-            @ApiResponse(responseCode = "503", description = "Required core gRPC service unavailable")
-    })
+    @ApiResponse(responseCode = "200", description = "Withdrawal registered",
+            content = @Content(schema = @Schema(implementation = OperationResponseDTO.class)))
+    @ApiResponse(responseCode = "400", description = "Invalid request, inactive account or insufficient balance")
+    @ApiResponse(responseCode = "404", description = "Account not found")
+    @ApiResponse(responseCode = "409", description = "Duplicated transaction UUID")
+    @ApiResponse(responseCode = "503", description = "Required core gRPC service unavailable")
     public ResponseEntity<OperationResponseDTO> tellerWithdrawal(@Valid @RequestBody TellerTransactionReqDTO request) {
         return ResponseEntity.ok(transactionService.executeWithdrawal(request));
     }
 
     @PostMapping("/transfer/p2p")
     @Operation(summary = "Execute P2P transfer", description = "Moves funds from an origin account to an on-us destination account.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Transfer executed",
-                    content = @Content(schema = @Schema(implementation = TransferResponseDTO.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid request, inactive account or insufficient balance"),
-            @ApiResponse(responseCode = "404", description = "Account not found"),
-            @ApiResponse(responseCode = "409", description = "Duplicated transaction UUID"),
-            @ApiResponse(responseCode = "503", description = "Required core gRPC service unavailable")
-    })
+    @ApiResponse(responseCode = "200", description = "Transfer executed",
+            content = @Content(schema = @Schema(implementation = TransferResponseDTO.class)))
+    @ApiResponse(responseCode = "400", description = "Invalid request, inactive account or insufficient balance")
+    @ApiResponse(responseCode = "404", description = "Account not found")
+    @ApiResponse(responseCode = "409", description = "Duplicated transaction UUID")
+    @ApiResponse(responseCode = "503", description = "Required core gRPC service unavailable")
     public ResponseEntity<TransferResponseDTO> transferP2P(@Valid @RequestBody TransferP2PReqDTO request) {
         return ResponseEntity.ok(transactionService.executeP2PTransfer(request));
     }

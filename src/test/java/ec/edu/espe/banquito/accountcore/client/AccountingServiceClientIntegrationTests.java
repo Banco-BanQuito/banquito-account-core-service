@@ -8,6 +8,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+
 class AccountingServiceClientIntegrationTests {
 
     @Test
@@ -17,17 +19,18 @@ class AccountingServiceClientIntegrationTests {
         AccountingServiceClient client = new AccountingServiceClient("localhost", 9092);
 
         try {
-            client.registerEntry(new AccountingEntryReqDTO(
-                    entryUuid,
-                    "Integration test from account-core-service",
-                    LocalDate.now(),
-                    List.of(
-                            new AccountingEntryReqDTO.JournalLineDTO(
-                                    "1.1.0.02", "DEBIT", new BigDecimal("10.00"), entryUuid),
-                            new AccountingEntryReqDTO.JournalLineDTO(
-                                    "2.1.0.01", "CREDIT", new BigDecimal("10.00"), entryUuid)
-                    )
-            ));
+            assertDoesNotThrow(() -> client.registerEntry(new AccountingEntryReqDTO(
+                            entryUuid,
+                            "Integration test from account-core-service",
+                            LocalDate.now(),
+                            List.of(
+                                    new AccountingEntryReqDTO.JournalLineDTO(
+                                            "1.1.0.02", "DEBIT", new BigDecimal("10.00"), entryUuid),
+                                    new AccountingEntryReqDTO.JournalLineDTO(
+                                            "2.1.0.01", "CREDIT", new BigDecimal("10.00"), entryUuid)
+                            )
+                    ))
+            );
         } finally {
             client.shutdown();
         }

@@ -7,7 +7,6 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -31,11 +30,9 @@ public class CalendarController {
 
     @GetMapping("/holidays/check")
     @Operation(summary = "Check holiday", description = "Indicates whether a date is registered as a holiday in the Core banking calendar.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Calendar status returned",
-                    content = @Content(schema = @Schema(implementation = HolidayCheckResponseDTO.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid or missing date")
-    })
+    @ApiResponse(responseCode = "200", description = "Calendar status returned",
+            content = @Content(schema = @Schema(implementation = HolidayCheckResponseDTO.class)))
+    @ApiResponse(responseCode = "400", description = "Invalid or missing date")
     public ResponseEntity<HolidayCheckResponseDTO> checkHoliday(
             @Parameter(description = "Date in ISO-8601 format", example = "2026-12-25", required = true)
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
