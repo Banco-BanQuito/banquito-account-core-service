@@ -2,8 +2,8 @@ package ec.edu.espe.banquito.accountcore.service;
 
 import ec.edu.espe.banquito.accountcore.client.AccountingServiceClient;
 import ec.edu.espe.banquito.accountcore.client.PartyServiceClient;
-import ec.edu.espe.banquito.accountcore.config.AccountingRulesProperties;
 import ec.edu.espe.banquito.accountcore.dto.AccountingOperationReqDTO;
+import ec.edu.espe.banquito.accountcore.dto.AccountingOperationResponseDTO;
 import ec.edu.espe.banquito.accountcore.dto.BatchCreditReqDTO;
 import ec.edu.espe.banquito.accountcore.dto.BatchCreditResponseDTO;
 import ec.edu.espe.banquito.accountcore.dto.CorporateDebitReqDTO;
@@ -36,7 +36,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -53,20 +52,17 @@ public class AccountTransactionService {
     private final TransactionSubtypeRepository transactionSubtypeRepository;
     private final AccountingServiceClient accountingServiceClient;
     private final PartyServiceClient partyServiceClient;
-    private final AccountingRulesProperties accountingRules;
 
     public AccountTransactionService(AccountRepository accountRepository,
                                      AccountTransactionRepository transactionRepository,
                                      TransactionSubtypeRepository transactionSubtypeRepository,
                                      AccountingServiceClient accountingServiceClient,
-                                     PartyServiceClient partyServiceClient,
-                                     AccountingRulesProperties accountingRules) {
+                                     PartyServiceClient partyServiceClient) {
         this.accountRepository = accountRepository;
         this.transactionRepository = transactionRepository;
         this.transactionSubtypeRepository = transactionSubtypeRepository;
         this.accountingServiceClient = accountingServiceClient;
         this.partyServiceClient = partyServiceClient;
-        this.accountingRules = accountingRules;
     }
 
     @Transactional(readOnly = true)
@@ -118,6 +114,7 @@ public class AccountTransactionService {
                 request.transactionUuid(),
                 AccountingOperationType.TELLER_DEPOSIT,
                 getAccountingProductType(account),
+                null,
                 request.amount(),
                 null,
                 descriptionOrDefault(request.reference(), "Teller deposit account " + account.getId()),
@@ -157,6 +154,7 @@ public class AccountTransactionService {
                 request.transactionUuid(),
                 AccountingOperationType.TELLER_WITHDRAWAL,
                 getAccountingProductType(account),
+                null,
                 request.amount(),
                 null,
                 descriptionOrDefault(request.reference(), "Teller withdrawal account " + account.getId()),
@@ -218,6 +216,7 @@ public class AccountTransactionService {
                 request.transactionUuid(),
                 AccountingOperationType.P2P_TRANSFER,
                 getAccountingProductType(sourceAccount),
+                getAccountingProductType(destinationAccount),
                 request.amount(),
                 BigDecimal.ZERO,
                 descriptionOrDefault(
@@ -269,6 +268,7 @@ public class AccountTransactionService {
                     creditItem.transactionUuid(),
                     AccountingOperationType.BATCH_CREDIT,
                     getAccountingProductType(account),
+                    null,
                     creditItem.amount(),
                     BigDecimal.ZERO,
                     descriptionOrDefault(
@@ -294,22 +294,30 @@ public class AccountTransactionService {
         Account account = getAccountForUpdate(request.accountNumber());
         validateActiveAccount(account);
         partyServiceClient.validateActiveCustomer(account.getCustomerId());
-
-        BigDecimal ivaAmount = request.commissionAmount()
-                .multiply(accountingRules.ivaRate())
-                .divide(BigDecimal.ONE.add(accountingRules.ivaRate()), 2, RoundingMode.HALF_UP);
-        BigDecimal commissionNet = request.commissionAmount().subtract(ivaAmount);
-        BigDecimal debitedAmount = request.totalAmount().add(request.commissionAmount());
-        validateSufficientBalance(account, debitedAmount);
-
-        debit(account, debitedAmount);
-        accountRepository.save(account);
+        validateSufficientBalance(account, request.totalAmount().add(request.commissionAmount()));
 
         LocalDate accountingDate = LocalDate.now(BANK_ZONE);
+        AccountingOperationResponseDTO accountingResult = accountingServiceClient.postOperation(
+                new AccountingOperationReqDTO(
+                        request.transactionUuid(),
+                        AccountingOperationType.CORPORATE_DEBIT,
+                        getAccountingProductType(account),
+                        null,
+                        request.totalAmount(),
+                        request.commissionAmount(),
+                        "Corporate debit batch " + request.batchId(),
+                        accountingDate
+                )
+        );
+        validateSufficientBalance(account, accountingResult.totalDebited());
+
+        debit(account, accountingResult.totalDebited());
+        accountRepository.save(account);
+
         AccountTransaction transaction = transactionRepository.save(createTransaction(
                 account,
                 new TransactionCreationData(
-                        debitedAmount,
+                        accountingResult.totalDebited(),
                         TransactionType.DEBITO,
                         TransactionSubtypeCode.DEB_EMP,
                         request.transactionUuid(),
@@ -319,21 +327,11 @@ public class AccountTransactionService {
                 )
         ));
 
-        accountingServiceClient.postOperation(new AccountingOperationReqDTO(
-                request.transactionUuid(),
-                AccountingOperationType.CORPORATE_DEBIT,
-                getAccountingProductType(account),
-                request.totalAmount(),
-                commissionNet,
-                "Corporate debit batch " + request.batchId(),
-                accountingDate
-        ));
-
         return new CorporateDebitResponseDTO(
                 transaction.getTransactionUuid(),
-                debitedAmount,
-                commissionNet,
-                ivaAmount,
+                accountingResult.totalDebited(),
+                accountingResult.commissionAmount(),
+                accountingResult.ivaAmount(),
                 transaction.getStatus(),
                 transaction.getAccountingDate()
         );

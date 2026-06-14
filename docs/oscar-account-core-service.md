@@ -459,9 +459,9 @@ Request:
 
 ```json
 {
-  "accountId": 10,
+  "accountNumber": "2200000010",
   "totalAmount": 50000.00,
-  "commissionAmount": 57.50,
+  "commissionAmount": 50.00,
   "batchId": "uuid-lote",
   "transactionUuid": "uuid"
 }
@@ -486,19 +486,12 @@ Hace:
 - Valida que la cuenta exista.
 - Valida que la cuenta este `ACTIVE`.
 - Valida cliente activo contra `party-service` via gRPC.
-- Calcula `debitedAmount = totalAmount + commissionAmount`.
-- Calcula IVA y comision neta.
+- Envia monto principal y comision neta a `accounting-service`.
+- Obtiene de Accounting la comision, el IVA y el total a debitar.
 - Valida saldo disponible suficiente.
 - Debita saldo disponible y contable.
 - Registra movimiento local `DEBIT / CORPORATE_DEBIT`.
-- Llama a `accounting-service` via gRPC para registrar asiento contable.
-
-Asiento contable enviado:
-
-- Debito: cuenta pasiva de la empresa.
-- Credito: cuenta puente de pagos.
-- Credito: `4.1.0.01` ingresos por servicios.
-- Credito: `2.2.0.01` IVA por pagar/retenido.
+- Accounting resuelve y registra el asiento contable mediante sus reglas parametrizadas.
 
 Errores relevantes:
 

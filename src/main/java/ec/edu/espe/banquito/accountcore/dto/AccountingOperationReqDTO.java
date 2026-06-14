@@ -9,7 +9,8 @@ import java.time.LocalDate;
 public record AccountingOperationReqDTO(
         String operationUuid,
         AccountingOperationType operationType,
-        AccountingProductType accountProductType,
+        AccountingProductType sourceAccountProductType,
+        AccountingProductType destinationAccountProductType,
         BigDecimal amount,
         BigDecimal commissionAmount,
         String reference,

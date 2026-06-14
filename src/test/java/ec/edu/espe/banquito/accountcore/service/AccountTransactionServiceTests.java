@@ -2,8 +2,8 @@ package ec.edu.espe.banquito.accountcore.service;
 
 import ec.edu.espe.banquito.accountcore.client.AccountingServiceClient;
 import ec.edu.espe.banquito.accountcore.client.PartyServiceClient;
-import ec.edu.espe.banquito.accountcore.config.AccountingRulesProperties;
 import ec.edu.espe.banquito.accountcore.dto.AccountingOperationReqDTO;
+import ec.edu.espe.banquito.accountcore.dto.AccountingOperationResponseDTO;
 import ec.edu.espe.banquito.accountcore.dto.BatchCreditReqDTO;
 import ec.edu.espe.banquito.accountcore.dto.CorporateDebitReqDTO;
 import ec.edu.espe.banquito.accountcore.dto.TellerTransactionReqDTO;
@@ -42,6 +42,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -68,16 +69,12 @@ class AccountTransactionServiceTests {
 
     @BeforeEach
     void setUp() {
-        AccountingRulesProperties rules = new AccountingRulesProperties(
-                new BigDecimal("0.15")
-        );
         service = new AccountTransactionService(
                 accountRepository,
                 transactionRepository,
                 transactionSubtypeRepository,
                 accountingServiceClient,
-                partyServiceClient,
-                rules
+                partyServiceClient
         );
 
         lenient().when(transactionRepository.existsByTransactionUuidAndTransactionDateAfter(anyString(), any()))
@@ -129,7 +126,8 @@ class AccountTransactionServiceTests {
         verify(partyServiceClient).validateActiveCustomer(1L);
         AccountingOperationReqDTO operation = capturedAccountingOperation();
         assertEquals(AccountingOperationType.TELLER_DEPOSIT, operation.operationType());
-        assertEquals(AccountingProductType.SAVINGS, operation.accountProductType());
+        assertEquals(AccountingProductType.SAVINGS, operation.sourceAccountProductType());
+        assertNull(operation.destinationAccountProductType());
         assertEquals(new BigDecimal("25.00"), operation.amount());
     }
 
@@ -145,7 +143,7 @@ class AccountTransactionServiceTests {
         assertEquals(new BigDecimal("70.00"), response.newBalance());
         AccountingOperationReqDTO operation = capturedAccountingOperation();
         assertEquals(AccountingOperationType.TELLER_WITHDRAWAL, operation.operationType());
-        assertEquals(AccountingProductType.CHECKING, operation.accountProductType());
+        assertEquals(AccountingProductType.CHECKING, operation.sourceAccountProductType());
     }
 
     @Test
@@ -165,7 +163,8 @@ class AccountTransactionServiceTests {
         assertEquals(new BigDecimal("60.00"), destination.getAvailableBalance());
         AccountingOperationReqDTO operation = capturedAccountingOperation();
         assertEquals(AccountingOperationType.P2P_TRANSFER, operation.operationType());
-        assertEquals(AccountingProductType.SAVINGS, operation.accountProductType());
+        assertEquals(AccountingProductType.SAVINGS, operation.sourceAccountProductType());
+        assertEquals(AccountingProductType.CHECKING, operation.destinationAccountProductType());
         assertEquals(BigDecimal.ZERO, operation.commissionAmount());
     }
 
@@ -197,11 +196,21 @@ class AccountTransactionServiceTests {
     void executesCorporateDebitWithCommissionAndVat() {
         Account account = account(3L, "2200000003", 3L, "1000.00", AccountSuperType.CORRIENTE);
         when(accountRepository.findWithLockByAccountNumber("2200000003")).thenReturn(Optional.of(account));
+        when(accountingServiceClient.postOperation(any())).thenReturn(new AccountingOperationResponseDTO(
+                10L,
+                "corporate-1",
+                "REGISTRADO",
+                "BALANCED",
+                LocalDateTime.of(2026, Month.JUNE, 11, 10, 0),
+                new BigDecimal("10.00"),
+                new BigDecimal("1.50"),
+                new BigDecimal("111.50")
+        ));
 
         var response = service.executeCorporateDebit(new CorporateDebitReqDTO(
                 "2200000003",
                 new BigDecimal("100.00"),
-                new BigDecimal("11.50"),
+                new BigDecimal("10.00"),
                 "batch-2",
                 "corporate-1"
         ));
@@ -212,7 +221,8 @@ class AccountTransactionServiceTests {
         assertEquals(new BigDecimal("888.50"), account.getAvailableBalance());
         AccountingOperationReqDTO operation = capturedAccountingOperation();
         assertEquals(AccountingOperationType.CORPORATE_DEBIT, operation.operationType());
-        assertEquals(AccountingProductType.CHECKING, operation.accountProductType());
+        assertEquals(AccountingProductType.CHECKING, operation.sourceAccountProductType());
+        assertNull(operation.destinationAccountProductType());
         assertEquals(new BigDecimal("100.00"), operation.amount());
         assertEquals(new BigDecimal("10.00"), operation.commissionAmount());
     }
