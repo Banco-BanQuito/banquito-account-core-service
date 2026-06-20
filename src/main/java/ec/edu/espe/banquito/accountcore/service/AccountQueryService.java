@@ -6,6 +6,7 @@ import ec.edu.espe.banquito.accountcore.dto.AccountSummaryResponseDTO;
 import ec.edu.espe.banquito.accountcore.dto.FavoriteAccountResponseDTO;
 import ec.edu.espe.banquito.accountcore.exception.AccountNotFoundException;
 import ec.edu.espe.banquito.accountcore.exception.FavoriteAccountNotFoundException;
+import ec.edu.espe.banquito.accountcore.mapper.AccountMapper;
 import ec.edu.espe.banquito.accountcore.model.Account;
 import ec.edu.espe.banquito.accountcore.repository.AccountRepository;
 import java.util.List;
@@ -14,8 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AccountQueryService {
-
-    private static final String CURRENCY = "USD";
 
     private final AccountRepository accountRepository;
     private final PartyServiceClient partyServiceClient;
@@ -48,21 +47,7 @@ public class AccountQueryService {
             // party-service unreachable or branch not found; leave name blank
         }
 
-        return new AccountDetailResponseDTO(
-                account.getId(),
-                account.getAccountNumber(),
-                account.getCustomerId(),
-                customerFullName,
-                account.getAccountSubtype().getDescription() != null
-                        ? account.getAccountSubtype().getDescription()
-                        : account.getAccountSubtype().getName(),
-                account.getBranchId(),
-                branchName,
-                account.getAvailableBalance(),
-                account.getAccountingBalance(),
-                account.getStatus(),
-                account.getOpeningDate()
-        );
+        return AccountMapper.toDetailResponse(account, customerFullName, branchName);
     }
 
     @Transactional(readOnly = true)
@@ -75,24 +60,7 @@ public class AccountQueryService {
                     } catch (Exception ignored) {
                     }
 
-                    String subtypeName = account.getAccountSubtype() != null
-                            ? (account.getAccountSubtype().getDescription() != null
-                                    ? account.getAccountSubtype().getDescription()
-                                    : account.getAccountSubtype().getName())
-                            : null;
-
-                    return new AccountSummaryResponseDTO(
-                            account.getId(),
-                            account.getAccountNumber(),
-                            account.getCustomerId(),
-                            account.getStatus(),
-                            account.getAvailableBalance(),
-                            account.getAccountingBalance(),
-                            CURRENCY,
-                            account.getBranchId(),
-                            branchName,
-                            subtypeName
-                    );
+                    return AccountMapper.toSummaryResponse(account, branchName);
                 })
                 .toList();
     }
@@ -115,15 +83,6 @@ public class AccountQueryService {
         Account account = accountRepository.findFirstByCustomerIdAndFavoriteTrueOrderByAccountNumberAsc(customerId)
                 .orElseThrow(() -> new FavoriteAccountNotFoundException(customerId));
 
-        return new FavoriteAccountResponseDTO(
-                account.getId(),
-                account.getAccountNumber(),
-                account.getCustomerId(),
-                account.getStatus(),
-                account.getAvailableBalance(),
-                account.getAccountingBalance(),
-                CURRENCY,
-                Boolean.TRUE.equals(account.getFavorite())
-        );
+        return AccountMapper.toFavoriteResponse(account);
     }
 }

@@ -27,8 +27,8 @@ import ec.edu.espe.banquito.accountcore.enums.TransactionSubtypeCode;
 import ec.edu.espe.banquito.accountcore.enums.TransactionType;
 import ec.edu.espe.banquito.accountcore.exception.AccountNotFoundException;
 import ec.edu.espe.banquito.accountcore.exception.DuplicateTransactionException;
+import ec.edu.espe.banquito.accountcore.domain.AccountDomainService;
 import ec.edu.espe.banquito.accountcore.exception.InactiveAccountException;
-import ec.edu.espe.banquito.accountcore.exception.InsufficientBalanceException;
 import ec.edu.espe.banquito.accountcore.model.Account;
 import ec.edu.espe.banquito.accountcore.model.AccountTransaction;
 import ec.edu.espe.banquito.accountcore.model.TransactionSubtype;
@@ -107,7 +107,7 @@ public class AccountTransactionService {
         validateActiveAccount(account);
         partyServiceClient.validateActiveCustomer(account.getCustomerId());
 
-        credit(account, request.amount());
+        AccountDomainService.credit(account, request.amount());
         accountRepository.save(account);
 
         LocalDate accountingDate = accountingDateService.resolveAccountingDate();
@@ -147,9 +147,9 @@ public class AccountTransactionService {
         Account account = getAccountForUpdate(request.accountId());
         validateActiveAccount(account);
         partyServiceClient.validateActiveCustomer(account.getCustomerId());
-        validateSufficientBalance(account, request.amount());
+        AccountDomainService.validateSufficientBalance(account, request.amount());
 
-        debit(account, request.amount());
+        AccountDomainService.debit(account, request.amount());
         accountRepository.save(account);
 
         LocalDate accountingDate = accountingDateService.resolveAccountingDate();
@@ -197,10 +197,10 @@ public class AccountTransactionService {
         validateActiveAccount(destinationAccount);
         partyServiceClient.validateActiveCustomer(sourceAccount.getCustomerId());
         partyServiceClient.validateActiveCustomer(destinationAccount.getCustomerId());
-        validateSufficientBalance(sourceAccount, request.amount());
+        AccountDomainService.validateSufficientBalance(sourceAccount, request.amount());
 
-        debit(sourceAccount, request.amount());
-        credit(destinationAccount, request.amount());
+        AccountDomainService.debit(sourceAccount, request.amount());
+        AccountDomainService.credit(destinationAccount, request.amount());
         accountRepository.save(sourceAccount);
         accountRepository.save(destinationAccount);
 
@@ -265,7 +265,7 @@ public class AccountTransactionService {
             validateActiveAccount(account);
             partyServiceClient.validateActiveCustomer(account.getCustomerId());
 
-            credit(account, creditItem.amount());
+            AccountDomainService.credit(account, creditItem.amount());
             accountRepository.save(account);
 
             LocalDate accountingDate = accountingDateService.resolveAccountingDate();
@@ -327,8 +327,8 @@ public class AccountTransactionService {
                 )
         );
 
-        validateSufficientBalance(account, accountingResult.totalDebited());
-        debit(account, accountingResult.totalDebited());
+        AccountDomainService.validateSufficientBalance(account, accountingResult.totalDebited());
+        AccountDomainService.debit(account, accountingResult.totalDebited());
         accountRepository.save(account);
 
         AccountTransaction transaction = transactionRepository.save(createTransaction(
@@ -379,8 +379,8 @@ public class AccountTransactionService {
                 )
         );
 
-        validateSufficientBalance(account, accountingResult.totalDebited());
-        debit(account, accountingResult.totalDebited());
+        AccountDomainService.validateSufficientBalance(account, accountingResult.totalDebited());
+        AccountDomainService.debit(account, accountingResult.totalDebited());
         accountRepository.save(account);
 
         AccountTransaction transaction = transactionRepository.save(createTransaction(
@@ -424,7 +424,7 @@ public class AccountTransactionService {
         validateActiveAccount(account);
         partyServiceClient.validateActiveCustomer(account.getCustomerId());
 
-        credit(account, request.refundAmount());
+        AccountDomainService.credit(account, request.refundAmount());
         accountRepository.save(account);
 
         LocalDate accountingDate = accountingDateService.resolveAccountingDate();
@@ -480,22 +480,6 @@ public class AccountTransactionService {
         if (account.getStatus() != AccountStatus.ACTIVA) {
             throw new InactiveAccountException(account.getAccountNumber());
         }
-    }
-
-    private void validateSufficientBalance(Account account, BigDecimal amount) {
-        if (account.getAvailableBalance().compareTo(amount) < 0) {
-            throw new InsufficientBalanceException(account.getAccountNumber());
-        }
-    }
-
-    private void debit(Account account, BigDecimal amount) {
-        account.setAvailableBalance(account.getAvailableBalance().subtract(amount));
-        account.setAccountingBalance(account.getAccountingBalance().subtract(amount));
-    }
-
-    private void credit(Account account, BigDecimal amount) {
-        account.setAvailableBalance(account.getAvailableBalance().add(amount));
-        account.setAccountingBalance(account.getAccountingBalance().add(amount));
     }
 
     private AccountTransaction createTransaction(Account account, TransactionCreationData data) {
