@@ -7,5 +7,6 @@ public enum TransactionSubtypeCode {
     DEB_EMP,
     DEV_EMP,   // RF-03: Devolución a empresa por líneas rechazadas del lote
     TRF_P2P_S,
-    TRF_P2P_E
+    TRF_P2P_E,
+    TRF_EXT_S
 }

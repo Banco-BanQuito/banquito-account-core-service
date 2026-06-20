@@ -6,6 +6,8 @@ import ec.edu.espe.banquito.accountcore.dto.AccountOpenResponseDTO;
 import ec.edu.espe.banquito.accountcore.dto.AccountSubtypeResponseDTO;
 import ec.edu.espe.banquito.accountcore.dto.AccountSummaryResponseDTO;
 import ec.edu.espe.banquito.accountcore.dto.BalanceResponseDTO;
+import ec.edu.espe.banquito.accountcore.dto.ExternalTransferReqDTO;
+import ec.edu.espe.banquito.accountcore.dto.ExternalTransferResponseDTO;
 import ec.edu.espe.banquito.accountcore.dto.FavoriteAccountResponseDTO;
 import ec.edu.espe.banquito.accountcore.dto.HealthResponseDTO;
 import ec.edu.espe.banquito.accountcore.dto.OperationResponseDTO;
@@ -20,6 +22,7 @@ import ec.edu.espe.banquito.accountcore.service.AccountOpenService;
 import ec.edu.espe.banquito.accountcore.service.AccountQueryService;
 import ec.edu.espe.banquito.accountcore.service.AccountStatusService;
 import ec.edu.espe.banquito.accountcore.service.AccountTransactionService;
+import ec.edu.espe.banquito.accountcore.service.ClearingPublisher;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -59,6 +62,7 @@ public class AccountController {
     private final AccountTransactionService transactionService;
     private final AccountOpenService accountOpenService;
     private final AccountStatusService accountStatusService;
+    private final ClearingPublisher clearingPublisher;
 
     public AccountController(
             AccountRepository accountRepository,
@@ -66,13 +70,15 @@ public class AccountController {
             AccountQueryService accountQueryService,
             AccountTransactionService transactionService,
             AccountOpenService accountOpenService,
-            AccountStatusService accountStatusService) {
+            AccountStatusService accountStatusService,
+            ClearingPublisher clearingPublisher) {
         this.accountRepository = accountRepository;
         this.accountSubtypeRepository = accountSubtypeRepository;
         this.accountQueryService = accountQueryService;
         this.transactionService = transactionService;
         this.accountOpenService = accountOpenService;
         this.accountStatusService = accountStatusService;
+        this.clearingPublisher = clearingPublisher;
     }
 
     @GetMapping("/{accountIdOrNumber}")
@@ -222,6 +228,25 @@ public class AccountController {
     @ApiResponse(responseCode = "503", description = "Required core gRPC service unavailable")
     public ResponseEntity<TransferResponseDTO> transferP2P(@Valid @RequestBody TransferP2PReqDTO request) {
         return ResponseEntity.ok(transactionService.executeP2PTransfer(request));
+    }
+
+    @PostMapping("/transfer/external")
+    @Operation(summary = "Execute external transfer", description = "Debits an account and routes the amount to another bank through the clearing house.")
+    @ApiResponse(responseCode = "200", description = "Transfer executed",
+            content = @Content(schema = @Schema(implementation = ExternalTransferResponseDTO.class)))
+    @ApiResponse(responseCode = "400", description = "Invalid request, inactive account or insufficient balance")
+    @ApiResponse(responseCode = "404", description = "Account not found")
+    @ApiResponse(responseCode = "409", description = "Duplicated transaction UUID")
+    @ApiResponse(responseCode = "503", description = "Required core gRPC service unavailable")
+    public ResponseEntity<ExternalTransferResponseDTO> transferExternal(@Valid @RequestBody ExternalTransferReqDTO request) {
+        ExternalTransferResponseDTO response = transactionService.executeExternalTransfer(request);
+        clearingPublisher.publishExternalTransfer(
+                response.originAccountNumber(),
+                request.externalBankCode(),
+                request.externalAccountNumber(),
+                request.amount(),
+                "Transferencia interbancaria a " + request.beneficiaryName());
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/health")

@@ -11,6 +11,8 @@ import ec.edu.espe.banquito.accountcore.dto.CorporateDebitReqDTO;
 import ec.edu.espe.banquito.accountcore.dto.CorporateDebitResponseDTO;
 import ec.edu.espe.banquito.accountcore.dto.CorporateRefundReqDTO;
 import ec.edu.espe.banquito.accountcore.dto.CorporateRefundResponseDTO;
+import ec.edu.espe.banquito.accountcore.dto.ExternalTransferReqDTO;
+import ec.edu.espe.banquito.accountcore.dto.ExternalTransferResponseDTO;
 import ec.edu.espe.banquito.accountcore.dto.OperationResponseDTO;
 import ec.edu.espe.banquito.accountcore.dto.TellerTransactionReqDTO;
 import ec.edu.espe.banquito.accountcore.dto.TransactionHistoryDTO;
@@ -51,6 +53,7 @@ import java.util.List;
 public class AccountTransactionService {
 
     private static final ZoneId BANK_ZONE = ZoneId.of("America/Guayaquil");
+    private static final BigDecimal EXTERNAL_TRANSFER_COMMISSION = new BigDecimal("0.60");
 
     private final AccountRepository accountRepository;
     private final AccountTransactionRepository transactionRepository;
@@ -346,6 +349,64 @@ public class AccountTransactionService {
                 accountingResult.totalDebited(),
                 accountingResult.commissionAmount(),
                 accountingResult.ivaAmount(),
+                transaction.getStatus(),
+                transaction.getAccountingDate()
+        );
+    }
+
+    @Transactional
+    public ExternalTransferResponseDTO executeExternalTransfer(ExternalTransferReqDTO request) {
+        validateIdempotency(request.transactionUuid());
+
+        Account account = getAccountForUpdate(request.originAccountId());
+        validateActiveAccount(account);
+        partyServiceClient.validateActiveCustomer(account.getCustomerId());
+
+        LocalDate accountingDate = accountingDateService.resolveAccountingDate();
+        AccountingOperationResponseDTO accountingResult = accountingServiceClient.postOperation(
+                new AccountingOperationReqDTO(
+                        request.transactionUuid(),
+                        AccountingOperationType.EXTERNAL_TRANSFER,
+                        getAccountingProductType(account),
+                        null,
+                        request.amount(),
+                        EXTERNAL_TRANSFER_COMMISSION,
+                        descriptionOrDefault(
+                                request.reference(),
+                                "Transferencia interbancaria a " + request.externalBankName()
+                                        + " cuenta " + request.externalAccountNumber()),
+                        accountingDate
+                )
+        );
+
+        validateSufficientBalance(account, accountingResult.totalDebited());
+        debit(account, accountingResult.totalDebited());
+        accountRepository.save(account);
+
+        AccountTransaction transaction = transactionRepository.save(createTransaction(
+                account,
+                new TransactionCreationData(
+                        accountingResult.totalDebited(),
+                        TransactionType.DEBITO,
+                        TransactionSubtypeCode.TRF_EXT_S,
+                        request.transactionUuid(),
+                        accountingDate,
+                        account.getAvailableBalance(),
+                        descriptionOrDefault(
+                                request.reference(),
+                                "Transferencia interbancaria a " + request.externalBankName()
+                                        + " cuenta " + request.externalAccountNumber())
+                )
+        ));
+
+        return new ExternalTransferResponseDTO(
+                transaction.getTransactionUuid(),
+                account.getAccountNumber(),
+                request.amount(),
+                accountingResult.commissionAmount(),
+                accountingResult.ivaAmount(),
+                accountingResult.totalDebited(),
+                account.getAvailableBalance(),
                 transaction.getStatus(),
                 transaction.getAccountingDate()
         );
