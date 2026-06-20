@@ -124,19 +124,7 @@ public class AccountController {
     public ResponseEntity<List<AccountSummaryResponseDTO>> getAccountsByCustomer(
             @Parameter(description = "Customer identifier managed by party-service", example = "2")
             @PathVariable Long customerId) {
-        List<AccountSummaryResponseDTO> accounts = accountRepository.findByCustomerIdOrderByAccountNumberAsc(customerId).stream()
-                .map(account -> new AccountSummaryResponseDTO(
-                        account.getId(),
-                        account.getAccountNumber(),
-                        account.getCustomerId(),
-                        account.getStatus(),
-                        account.getAvailableBalance(),
-                        account.getAccountingBalance(),
-                        CURRENCY,
-                        account.getBranchId()
-                ))
-                .toList();
-        return ResponseEntity.ok(accounts);
+        return ResponseEntity.ok(accountQueryService.listAccountsByCustomer(customerId));
     }
 
     @GetMapping("/customer/{customerId}/favorite")

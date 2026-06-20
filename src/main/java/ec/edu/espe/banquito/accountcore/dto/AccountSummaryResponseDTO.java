@@ -12,5 +12,7 @@ public record AccountSummaryResponseDTO(
         BigDecimal availableBalance,
         BigDecimal accountingBalance,
         String currency,
-        Integer branchId
+        Integer branchId,
+        String branchName,
+        String accountSubtypeName
 ) {}

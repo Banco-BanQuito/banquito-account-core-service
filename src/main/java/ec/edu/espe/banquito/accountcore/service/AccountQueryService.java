@@ -2,11 +2,13 @@ package ec.edu.espe.banquito.accountcore.service;
 
 import ec.edu.espe.banquito.accountcore.client.PartyServiceClient;
 import ec.edu.espe.banquito.accountcore.dto.AccountDetailResponseDTO;
+import ec.edu.espe.banquito.accountcore.dto.AccountSummaryResponseDTO;
 import ec.edu.espe.banquito.accountcore.dto.FavoriteAccountResponseDTO;
 import ec.edu.espe.banquito.accountcore.exception.AccountNotFoundException;
 import ec.edu.espe.banquito.accountcore.exception.FavoriteAccountNotFoundException;
 import ec.edu.espe.banquito.accountcore.model.Account;
 import ec.edu.espe.banquito.accountcore.repository.AccountRepository;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -61,6 +63,38 @@ public class AccountQueryService {
                 account.getStatus(),
                 account.getOpeningDate()
         );
+    }
+
+    @Transactional(readOnly = true)
+    public List<AccountSummaryResponseDTO> listAccountsByCustomer(Long customerId) {
+        return accountRepository.findByCustomerIdOrderByAccountNumberAsc(customerId).stream()
+                .map(account -> {
+                    String branchName = null;
+                    try {
+                        branchName = this.partyServiceClient.getBranch(account.getBranchId()).getName();
+                    } catch (Exception ignored) {
+                    }
+
+                    String subtypeName = account.getAccountSubtype() != null
+                            ? (account.getAccountSubtype().getDescription() != null
+                                    ? account.getAccountSubtype().getDescription()
+                                    : account.getAccountSubtype().getName())
+                            : null;
+
+                    return new AccountSummaryResponseDTO(
+                            account.getId(),
+                            account.getAccountNumber(),
+                            account.getCustomerId(),
+                            account.getStatus(),
+                            account.getAvailableBalance(),
+                            account.getAccountingBalance(),
+                            CURRENCY,
+                            account.getBranchId(),
+                            branchName,
+                            subtypeName
+                    );
+                })
+                .toList();
     }
 
     private Account findAccount(String accountIdOrNumber) {
