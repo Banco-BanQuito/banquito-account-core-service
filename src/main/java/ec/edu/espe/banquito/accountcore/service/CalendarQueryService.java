@@ -1,7 +1,7 @@
 package ec.edu.espe.banquito.accountcore.service;
 
 import ec.edu.espe.banquito.accountcore.dto.HolidayCheckResponseDTO;
-import ec.edu.espe.banquito.accountcore.model.Holiday;
+import ec.edu.espe.banquito.accountcore.mapper.HolidayMapper;
 import ec.edu.espe.banquito.accountcore.repository.HolidayRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,16 +24,7 @@ public class CalendarQueryService {
         }
 
         return holidayRepository.findById(date)
-                .map(holiday -> toResponse(date, holiday))
+                .map(holiday -> HolidayMapper.toResponse(date, holiday))
                 .orElseGet(() -> new HolidayCheckResponseDTO(date, false, null, false));
-    }
-
-    private HolidayCheckResponseDTO toResponse(LocalDate date, Holiday holiday) {
-        return new HolidayCheckResponseDTO(
-                date,
-                true,
-                holiday.getName(),
-                Boolean.TRUE.equals(holiday.getIsWeekend())
-        );
     }
 }
