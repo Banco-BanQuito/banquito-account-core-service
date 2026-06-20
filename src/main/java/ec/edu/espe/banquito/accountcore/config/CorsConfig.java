@@ -22,6 +22,10 @@ public class CorsConfig {
                         .allowedOrigins(origins)
                         .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
                         .allowedHeaders("*");
+                registry.addMapping("/v3/api-docs/**")
+                        .allowedOrigins(origins)
+                        .allowedMethods("GET", "OPTIONS")
+                        .allowedHeaders("*");
             }
         };
     }
