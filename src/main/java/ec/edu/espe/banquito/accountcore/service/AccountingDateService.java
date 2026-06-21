@@ -24,11 +24,6 @@ public class AccountingDateService {
         this.cutOffTime = LocalTime.parse(cutOffTimeRaw);
     }
 
-    /**
-     * Returns the effective accounting date (ACCOUNTING_DATE) for a new transaction.
-     * If the current bank time is after the EOD cut-off, the date advances to the
-     * next business day (skipping weekends and registered bank holidays).
-     */
     public LocalDate resolveAccountingDate() {
         ZonedDateTime now = ZonedDateTime.now(BANK_ZONE);
         LocalDate candidate = now.toLocalDate();
