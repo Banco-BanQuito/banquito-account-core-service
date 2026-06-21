@@ -31,11 +31,7 @@ public class AccountMapper {
     }
 
     public static AccountSummaryResponseDTO toSummaryResponse(Account account, String branchName) {
-        String subtypeName = account.getAccountSubtype() != null
-                ? (account.getAccountSubtype().getDescription() != null
-                        ? account.getAccountSubtype().getDescription()
-                        : account.getAccountSubtype().getName())
-                : null;
+        String subtypeName = resolveSubtypeName(account);
 
         return new AccountSummaryResponseDTO(
                 account.getId(),
@@ -49,6 +45,14 @@ public class AccountMapper {
                 branchName,
                 subtypeName
         );
+    }
+
+    private static String resolveSubtypeName(Account account) {
+        if (account.getAccountSubtype() == null) {
+            return null;
+        }
+        String description = account.getAccountSubtype().getDescription();
+        return description != null ? description : account.getAccountSubtype().getName();
     }
 
     public static FavoriteAccountResponseDTO toFavoriteResponse(Account account) {

@@ -524,7 +524,7 @@ public class AccountTransactionService {
                             "transactionType", type.name(),
                             "amount", amount.toPlainString(),
                             "newBalance", newBalance.toPlainString(),
-                            "date", LocalDate.now().toString()
+                            "date", LocalDate.now(BANK_ZONE).toString()
                     )
             );
         } catch (Exception ignored) {

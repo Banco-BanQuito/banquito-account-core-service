@@ -58,6 +58,7 @@ public class AccountQueryService {
                     try {
                         branchName = this.partyServiceClient.getBranch(account.getBranchId()).getName();
                     } catch (Exception ignored) {
+                        // Keep account results available when branch enrichment is unavailable.
                     }
 
                     return AccountMapper.toSummaryResponse(account, branchName);

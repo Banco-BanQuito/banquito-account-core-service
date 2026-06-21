@@ -14,9 +14,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZoneId;
 
 @Service
 public class AccountOpenService {
+
+    private static final ZoneId BANK_ZONE = ZoneId.of("America/Guayaquil");
 
     private final AccountRepository accountRepository;
     private final AccountSubtypeRepository accountSubtypeRepository;
@@ -69,7 +72,7 @@ public class AccountOpenService {
                 subtype.getName(),
                 deposit,
                 saved.getStatus().name(),
-                LocalDate.now()
+                LocalDate.now(BANK_ZONE)
         );
     }
 

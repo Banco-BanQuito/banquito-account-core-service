@@ -84,7 +84,7 @@ class AccountTransactionServiceTests {
         );
 
         lenient().when(accountingDateService.resolveAccountingDate())
-                .thenReturn(LocalDate.of(2026, 6, 17));
+                .thenReturn(LocalDate.of(2026, Month.JUNE, 17));
         lenient().when(transactionRepository.existsByTransactionUuidAndTransactionDateAfter(anyString(), any()))
                 .thenReturn(false);
         lenient().when(transactionSubtypeRepository.findByCode(anyString()))

@@ -10,10 +10,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Map;
 
 @Service
 public class AccountStatusService {
+
+    private static final ZoneId BANK_ZONE = ZoneId.of("America/Guayaquil");
 
     private final AccountRepository accountRepository;
     private final PartyServiceClient partyServiceClient;
@@ -56,7 +59,7 @@ public class AccountStatusService {
                             "customerName", customerName != null ? customerName : "",
                             "accountNumber", account.getAccountNumber(),
                             "newStatus", newStatus.name(),
-                            "date", LocalDate.now().toString()
+                            "date", LocalDate.now(BANK_ZONE).toString()
                     )
             );
         } catch (Exception ignored) {

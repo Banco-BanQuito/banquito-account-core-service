@@ -16,7 +16,6 @@ import ec.edu.espe.banquito.accountcore.dto.TransactionHistoryDTO;
 import ec.edu.espe.banquito.accountcore.dto.TransferP2PReqDTO;
 import ec.edu.espe.banquito.accountcore.dto.TransferResponseDTO;
 import ec.edu.espe.banquito.accountcore.enums.AccountStatus;
-import ec.edu.espe.banquito.accountcore.repository.AccountRepository;
 import ec.edu.espe.banquito.accountcore.repository.AccountSubtypeRepository;
 import ec.edu.espe.banquito.accountcore.service.AccountOpenService;
 import ec.edu.espe.banquito.accountcore.service.AccountQueryService;
@@ -34,8 +33,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -50,13 +47,11 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v2/accounts")
-@CrossOrigin(origins = "*", allowedHeaders = "*")
 @Tag(name = "Accounts", description = "Account balance, transaction history and on-us account operations.")
 public class AccountController {
 
     private static final String CURRENCY = "USD";
 
-    private final AccountRepository accountRepository;
     private final AccountSubtypeRepository accountSubtypeRepository;
     private final AccountQueryService accountQueryService;
     private final AccountTransactionService transactionService;
@@ -65,14 +60,12 @@ public class AccountController {
     private final ClearingPublisher clearingPublisher;
 
     public AccountController(
-            AccountRepository accountRepository,
             AccountSubtypeRepository accountSubtypeRepository,
             AccountQueryService accountQueryService,
             AccountTransactionService transactionService,
             AccountOpenService accountOpenService,
             AccountStatusService accountStatusService,
             ClearingPublisher clearingPublisher) {
-        this.accountRepository = accountRepository;
         this.accountSubtypeRepository = accountSubtypeRepository;
         this.accountQueryService = accountQueryService;
         this.transactionService = transactionService;

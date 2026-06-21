@@ -7,10 +7,13 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.UUID;
 
 @Service
 public class ClearingPublisher {
+
+    private static final ZoneId BANK_ZONE = ZoneId.of("America/Guayaquil");
 
     private final RabbitTemplate rabbitTemplate;
     private final String clearingExchange;
@@ -36,7 +39,7 @@ public class ClearingPublisher {
         message.setAmount(amount);
         message.setCurrency("USD");
         message.setConcept(concept);
-        message.setValueDate(LocalDate.now());
+        message.setValueDate(LocalDate.now(BANK_ZONE));
 
         rabbitTemplate.convertAndSend(clearingExchange, clearingRoutingKey, message);
     }

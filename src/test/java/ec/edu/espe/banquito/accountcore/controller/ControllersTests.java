@@ -89,7 +89,7 @@ class ControllersTests {
         AccountSubtypeRepository subtypeRepository = mock(AccountSubtypeRepository.class);
         AccountQueryService queryService = mock(AccountQueryService.class);
         AccountTransactionService transactionService = mock(AccountTransactionService.class);
-        AccountController controller = new AccountController(repository, subtypeRepository, queryService, transactionService, mock(ec.edu.espe.banquito.accountcore.service.AccountOpenService.class), mock(ec.edu.espe.banquito.accountcore.service.AccountStatusService.class), mock(ec.edu.espe.banquito.accountcore.service.ClearingPublisher.class));
+        AccountController controller = new AccountController(subtypeRepository, queryService, transactionService, mock(ec.edu.espe.banquito.accountcore.service.AccountOpenService.class), mock(ec.edu.espe.banquito.accountcore.service.AccountStatusService.class), mock(ec.edu.espe.banquito.accountcore.service.ClearingPublisher.class));
         Account account = account();
         when(repository.findById(1L)).thenReturn(Optional.of(account));
         when(queryService.resolveAccount("1")).thenReturn(account);
@@ -109,11 +109,10 @@ class ControllersTests {
 
     @Test
     void delegatesFavoriteHistoryAndTransactions() {
-        AccountRepository repository = mock(AccountRepository.class);
         AccountSubtypeRepository subtypeRepository = mock(AccountSubtypeRepository.class);
         AccountQueryService queryService = mock(AccountQueryService.class);
         AccountTransactionService transactionService = mock(AccountTransactionService.class);
-        AccountController controller = new AccountController(repository, subtypeRepository, queryService, transactionService, mock(ec.edu.espe.banquito.accountcore.service.AccountOpenService.class), mock(ec.edu.espe.banquito.accountcore.service.AccountStatusService.class), mock(ec.edu.espe.banquito.accountcore.service.ClearingPublisher.class));
+        AccountController controller = new AccountController(subtypeRepository, queryService, transactionService, mock(ec.edu.espe.banquito.accountcore.service.AccountOpenService.class), mock(ec.edu.espe.banquito.accountcore.service.AccountStatusService.class), mock(ec.edu.espe.banquito.accountcore.service.ClearingPublisher.class));
         FavoriteAccountResponseDTO favorite = mock(FavoriteAccountResponseDTO.class);
         TransactionHistoryDTO history = mock(TransactionHistoryDTO.class);
         OperationResponseDTO operation = mock(OperationResponseDTO.class);

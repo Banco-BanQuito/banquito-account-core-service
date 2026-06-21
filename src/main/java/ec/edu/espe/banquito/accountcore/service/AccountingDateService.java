@@ -48,7 +48,7 @@ public class AccountingDateService {
         return ZonedDateTime.now(BANK_ZONE).toLocalTime().isAfter(cutOffTime);
     }
 
-    private LocalDate nextBusinessDay(LocalDate date) {
+    LocalDate nextBusinessDay(LocalDate date) {
         while (isNonBusinessDay(date)) {
             date = date.plusDays(1);
         }
@@ -57,7 +57,7 @@ public class AccountingDateService {
 
     private boolean isNonBusinessDay(LocalDate date) {
         DayOfWeek dow = date.getDayOfWeek();
-        if (dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY) {
+        if (DayOfWeek.SATURDAY.equals(dow) || DayOfWeek.SUNDAY.equals(dow)) {
             return true;
         }
         return holidayRepository.existsByHolidayDate(date);
