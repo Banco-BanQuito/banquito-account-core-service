@@ -3,7 +3,7 @@ syntax = "proto3";
 package banquito.accounting.v2;
 
 option java_multiple_files = true;
-option java_package = "ec.edu.espe.banquito.accountcore.grpc.accounting";
+option java_package = "ec.edu.espe.banquito.core.accountcore.grpc.accounting";
 option java_outer_classname = "AccountingServiceProto";
 
 service AccountingService {

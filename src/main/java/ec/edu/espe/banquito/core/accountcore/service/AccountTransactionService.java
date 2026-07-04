@@ -1,0 +1,540 @@
+package ec.edu.espe.banquito.core.accountcore.service;
+
+import ec.edu.espe.banquito.core.accountcore.client.AccountingServiceClient;
+import ec.edu.espe.banquito.core.accountcore.client.PartyServiceClient;
+import ec.edu.espe.banquito.core.accountcore.client.NotificationGrpcClient;
+import ec.edu.espe.banquito.core.accountcore.dto.AccountingOperationReqDTO;
+import ec.edu.espe.banquito.core.accountcore.dto.AccountingOperationResponseDTO;
+import ec.edu.espe.banquito.core.accountcore.dto.BatchCreditReqDTO;
+import ec.edu.espe.banquito.core.accountcore.dto.BatchCreditResponseDTO;
+import ec.edu.espe.banquito.core.accountcore.dto.CorporateDebitReqDTO;
+import ec.edu.espe.banquito.core.accountcore.dto.CorporateDebitResponseDTO;
+import ec.edu.espe.banquito.core.accountcore.dto.CorporateRefundReqDTO;
+import ec.edu.espe.banquito.core.accountcore.dto.CorporateRefundResponseDTO;
+import ec.edu.espe.banquito.core.accountcore.dto.ExternalTransferReqDTO;
+import ec.edu.espe.banquito.core.accountcore.dto.ExternalTransferResponseDTO;
+import ec.edu.espe.banquito.core.accountcore.dto.OperationResponseDTO;
+import ec.edu.espe.banquito.core.accountcore.dto.TellerTransactionReqDTO;
+import ec.edu.espe.banquito.core.accountcore.dto.TransactionHistoryDTO;
+import ec.edu.espe.banquito.core.accountcore.dto.TransferP2PReqDTO;
+import ec.edu.espe.banquito.core.accountcore.dto.TransferResponseDTO;
+import ec.edu.espe.banquito.core.accountcore.enums.AccountStatus;
+import ec.edu.espe.banquito.core.accountcore.enums.AccountSuperType;
+import ec.edu.espe.banquito.core.accountcore.enums.AccountingOperationType;
+import ec.edu.espe.banquito.core.accountcore.enums.AccountingProductType;
+import ec.edu.espe.banquito.core.accountcore.enums.TransactionStatus;
+import ec.edu.espe.banquito.core.accountcore.enums.TransactionSubtypeCode;
+import ec.edu.espe.banquito.core.accountcore.enums.TransactionType;
+import ec.edu.espe.banquito.core.accountcore.exception.AccountNotFoundException;
+import ec.edu.espe.banquito.core.accountcore.exception.DuplicateTransactionException;
+import ec.edu.espe.banquito.core.accountcore.domain.AccountDomainService;
+import ec.edu.espe.banquito.core.accountcore.exception.InactiveAccountException;
+import ec.edu.espe.banquito.core.accountcore.model.Account;
+import ec.edu.espe.banquito.core.accountcore.model.AccountTransaction;
+import ec.edu.espe.banquito.core.accountcore.model.TransactionSubtype;
+import ec.edu.espe.banquito.core.accountcore.repository.AccountRepository;
+import ec.edu.espe.banquito.core.accountcore.repository.AccountTransactionRepository;
+import ec.edu.espe.banquito.core.accountcore.repository.TransactionSubtypeRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
+
+@Service
+public class AccountTransactionService {
+
+    private static final ZoneId BANK_ZONE = ZoneId.of("America/Guayaquil");
+    private static final BigDecimal EXTERNAL_TRANSFER_COMMISSION = new BigDecimal("0.60");
+
+    private final AccountRepository accountRepository;
+    private final AccountTransactionRepository transactionRepository;
+    private final TransactionSubtypeRepository transactionSubtypeRepository;
+    private final AccountingServiceClient accountingServiceClient;
+    private final PartyServiceClient partyServiceClient;
+    private final NotificationGrpcClient notificationGrpcClient;
+    private final AccountingDateService accountingDateService;
+
+    public AccountTransactionService(AccountRepository accountRepository,
+                                     AccountTransactionRepository transactionRepository,
+                                     TransactionSubtypeRepository transactionSubtypeRepository,
+                                     AccountingServiceClient accountingServiceClient,
+                                     PartyServiceClient partyServiceClient,
+                                     NotificationGrpcClient notificationGrpcClient,
+                                     AccountingDateService accountingDateService) {
+        this.accountRepository = accountRepository;
+        this.transactionRepository = transactionRepository;
+        this.transactionSubtypeRepository = transactionSubtypeRepository;
+        this.accountingServiceClient = accountingServiceClient;
+        this.partyServiceClient = partyServiceClient;
+        this.notificationGrpcClient = notificationGrpcClient;
+        this.accountingDateService = accountingDateService;
+    }
+
+    @Transactional(readOnly = true)
+    public TransactionHistoryDTO getTransactionHistory(Long accountId, LocalDate from, LocalDate to, Pageable pageable) {
+        if (!accountRepository.existsById(accountId)) {
+            throw new AccountNotFoundException(accountId);
+        }
+        Page<AccountTransaction> page = transactionRepository.findHistory(accountId, from, to, pageable);
+        List<TransactionHistoryDTO.TransactionHistoryItemDTO> content = page.getContent().stream()
+                .map(transaction -> new TransactionHistoryDTO.TransactionHistoryItemDTO(
+                        transaction.getTransactionUuid(),
+                        transaction.getMovementType().name(),
+                        transaction.getAmount(),
+                        transaction.getResultingBalance(),
+                        transaction.getTransactionDate(),
+                        transaction.getAccountingDate(),
+                        transaction.getDescription()
+                ))
+                .toList();
+        return new TransactionHistoryDTO(content, page.getTotalElements(), page.getNumber());
+    }
+
+    @Transactional
+    public OperationResponseDTO executeDeposit(TellerTransactionReqDTO request) {
+        validateIdempotency(request.transactionUuid());
+
+        Account account = getAccountForUpdate(request.accountId());
+        validateActiveAccount(account);
+        partyServiceClient.validateActiveCustomer(account.getCustomerId());
+
+        AccountDomainService.credit(account, request.amount());
+        accountRepository.save(account);
+
+        LocalDate accountingDate = accountingDateService.resolveAccountingDate();
+        AccountTransaction transaction = transactionRepository.save(createTransaction(
+                account,
+                new TransactionCreationData(
+                        request.amount(),
+                        TransactionType.CREDITO,
+                        TransactionSubtypeCode.DEP_VEN,
+                        request.transactionUuid(),
+                        accountingDate,
+                        account.getAvailableBalance(),
+                        descriptionOrDefault(request.reference(), "Teller deposit")
+                )
+        ));
+
+        accountingServiceClient.postOperation(new AccountingOperationReqDTO(
+                request.transactionUuid(),
+                AccountingOperationType.TELLER_DEPOSIT,
+                getAccountingProductType(account),
+                null,
+                request.amount(),
+                null,
+                descriptionOrDefault(request.reference(), "Teller deposit account " + account.getId()),
+                accountingDate
+        ));
+
+        notifyTransaction(account, TransactionType.CREDITO, request.amount(), account.getAvailableBalance());
+
+        return toOperationResponse(transaction, account.getAvailableBalance());
+    }
+
+    @Transactional
+    public OperationResponseDTO executeWithdrawal(TellerTransactionReqDTO request) {
+        validateIdempotency(request.transactionUuid());
+
+        Account account = getAccountForUpdate(request.accountId());
+        validateActiveAccount(account);
+        partyServiceClient.validateActiveCustomer(account.getCustomerId());
+        AccountDomainService.validateSufficientBalance(account, request.amount());
+
+        AccountDomainService.debit(account, request.amount());
+        accountRepository.save(account);
+
+        LocalDate accountingDate = accountingDateService.resolveAccountingDate();
+        AccountTransaction transaction = transactionRepository.save(createTransaction(
+                account,
+                new TransactionCreationData(
+                        request.amount(),
+                        TransactionType.DEBITO,
+                        TransactionSubtypeCode.RET_VEN,
+                        request.transactionUuid(),
+                        accountingDate,
+                        account.getAvailableBalance(),
+                        descriptionOrDefault(request.reference(), "Teller withdrawal")
+                )
+        ));
+
+        accountingServiceClient.postOperation(new AccountingOperationReqDTO(
+                request.transactionUuid(),
+                AccountingOperationType.TELLER_WITHDRAWAL,
+                getAccountingProductType(account),
+                null,
+                request.amount(),
+                null,
+                descriptionOrDefault(request.reference(), "Teller withdrawal account " + account.getId()),
+                accountingDate
+        ));
+
+        notifyTransaction(account, TransactionType.DEBITO, request.amount(), account.getAvailableBalance());
+
+        return toOperationResponse(transaction, account.getAvailableBalance());
+    }
+
+    @Transactional
+    public TransferResponseDTO executeP2PTransfer(TransferP2PReqDTO request) {
+        validateIdempotency(request.transactionUuid());
+
+        Account sourceAccount = getAccountForUpdate(request.originAccountId());
+        Account destinationAccount = getAccountForUpdate(request.destinationAccountNumber());
+
+        if (sourceAccount.getAccountNumber().equals(destinationAccount.getAccountNumber())) {
+            throw new IllegalArgumentException("Source and destination accounts must be different");
+        }
+
+        validateActiveAccount(sourceAccount);
+        validateActiveAccount(destinationAccount);
+        partyServiceClient.validateActiveCustomer(sourceAccount.getCustomerId());
+        partyServiceClient.validateActiveCustomer(destinationAccount.getCustomerId());
+        AccountDomainService.validateSufficientBalance(sourceAccount, request.amount());
+
+        AccountDomainService.debit(sourceAccount, request.amount());
+        AccountDomainService.credit(destinationAccount, request.amount());
+        accountRepository.save(sourceAccount);
+        accountRepository.save(destinationAccount);
+
+        LocalDate accountingDate = accountingDateService.resolveAccountingDate();
+        AccountTransaction debitTransaction = transactionRepository.save(createTransaction(
+                sourceAccount,
+                new TransactionCreationData(
+                        request.amount(),
+                        TransactionType.DEBITO,
+                        TransactionSubtypeCode.TRF_P2P_S,
+                        request.transactionUuid(),
+                        accountingDate,
+                        sourceAccount.getAvailableBalance(),
+                        descriptionOrDefault(request.reference(), "Internal P2P transfer sent")
+                )
+        ));
+        transactionRepository.save(createTransaction(
+                destinationAccount,
+                new TransactionCreationData(
+                        request.amount(),
+                        TransactionType.CREDITO,
+                        TransactionSubtypeCode.TRF_P2P_E,
+                        request.transactionUuid(),
+                        accountingDate,
+                        destinationAccount.getAvailableBalance(),
+                        descriptionOrDefault(request.reference(), "Internal P2P transfer received")
+                )
+        ));
+
+        accountingServiceClient.postOperation(new AccountingOperationReqDTO(
+                request.transactionUuid(),
+                AccountingOperationType.P2P_TRANSFER,
+                getAccountingProductType(sourceAccount),
+                getAccountingProductType(destinationAccount),
+                request.amount(),
+                BigDecimal.ZERO,
+                descriptionOrDefault(
+                        request.reference(),
+                        "Internal P2P transfer " + sourceAccount.getAccountNumber()
+                                + " to " + destinationAccount.getAccountNumber()),
+                accountingDate
+        ));
+
+        return new TransferResponseDTO(
+                debitTransaction.getTransactionUuid(),
+                sourceAccount.getAvailableBalance(),
+                destinationAccount.getAccountNumber(),
+                partyServiceClient.getHolderNameByAccount(destinationAccount.getAccountNumber()),
+                debitTransaction.getStatus(),
+                debitTransaction.getAccountingDate()
+        );
+    }
+
+    @Transactional
+    public BatchCreditResponseDTO executeBatchCredit(BatchCreditReqDTO request) {
+        List<BatchCreditResponseDTO.BatchCreditResultDTO> results = new ArrayList<>();
+
+        for (BatchCreditReqDTO.CreditItemDTO creditItem : request.credits()) {
+            validateIdempotency(creditItem.transactionUuid());
+
+            Account account = getAccountForUpdate(creditItem.accountNumber());
+            validateActiveAccount(account);
+            partyServiceClient.validateActiveCustomer(account.getCustomerId());
+
+            AccountDomainService.credit(account, creditItem.amount());
+            accountRepository.save(account);
+
+            LocalDate accountingDate = accountingDateService.resolveAccountingDate();
+            transactionRepository.save(createTransaction(
+                    account,
+                    new TransactionCreationData(
+                            creditItem.amount(),
+                            TransactionType.CREDITO,
+                            TransactionSubtypeCode.PAG_NOM_C,
+                            creditItem.transactionUuid(),
+                            accountingDate,
+                            account.getAvailableBalance(),
+                            descriptionOrDefault(creditItem.reference(), "Batch credit " + request.batchId())
+                    )
+            ));
+
+            accountingServiceClient.postOperation(new AccountingOperationReqDTO(
+                    creditItem.transactionUuid(),
+                    AccountingOperationType.BATCH_CREDIT,
+                    getAccountingProductType(account),
+                    null,
+                    creditItem.amount(),
+                    BigDecimal.ZERO,
+                    descriptionOrDefault(
+                            creditItem.reference(),
+                            "Batch credit " + request.batchId() + " account " + account.getId()),
+                    accountingDate
+            ));
+
+            results.add(new BatchCreditResponseDTO.BatchCreditResultDTO(
+                    creditItem.accountNumber(),
+                    "SUCCESS",
+                    creditItem.transactionUuid()
+            ));
+        }
+
+        return new BatchCreditResponseDTO(request.batchId(), results.size(), 0, results);
+    }
+
+    @Transactional
+    public CorporateDebitResponseDTO executeCorporateDebit(CorporateDebitReqDTO request) {
+        validateIdempotency(request.transactionUuid());
+
+        Account account = getAccountForUpdate(request.accountNumber());
+        validateActiveAccount(account);
+        partyServiceClient.validateActiveCustomer(account.getCustomerId());
+
+        LocalDate accountingDate = accountingDateService.resolveAccountingDate();
+        AccountingOperationResponseDTO accountingResult = accountingServiceClient.postOperation(
+                new AccountingOperationReqDTO(
+                        request.transactionUuid(),
+                        AccountingOperationType.CORPORATE_DEBIT,
+                        getAccountingProductType(account),
+                        null,
+                        request.totalAmount(),
+                        request.commissionAmount(),
+                        "Corporate debit batch " + request.batchId(),
+                        accountingDate
+                )
+        );
+
+        AccountDomainService.validateSufficientBalance(account, accountingResult.totalDebited());
+        AccountDomainService.debit(account, accountingResult.totalDebited());
+        accountRepository.save(account);
+
+        AccountTransaction transaction = transactionRepository.save(createTransaction(
+                account,
+                new TransactionCreationData(
+                        accountingResult.totalDebited(),
+                        TransactionType.DEBITO,
+                        TransactionSubtypeCode.DEB_EMP,
+                        request.transactionUuid(),
+                        accountingDate,
+                        account.getAvailableBalance(),
+                        "Corporate debit batch " + request.batchId()
+                )
+        ));
+
+        return new CorporateDebitResponseDTO(
+                transaction.getTransactionUuid(),
+                accountingResult.totalDebited(),
+                accountingResult.commissionAmount(),
+                accountingResult.ivaAmount(),
+                transaction.getStatus(),
+                transaction.getAccountingDate()
+        );
+    }
+
+    @Transactional
+    public ExternalTransferResponseDTO executeExternalTransfer(ExternalTransferReqDTO request) {
+        validateIdempotency(request.transactionUuid());
+
+        Account account = getAccountForUpdate(request.originAccountId());
+        validateActiveAccount(account);
+        partyServiceClient.validateActiveCustomer(account.getCustomerId());
+
+        LocalDate accountingDate = accountingDateService.resolveAccountingDate();
+        AccountingOperationResponseDTO accountingResult = accountingServiceClient.postOperation(
+                new AccountingOperationReqDTO(
+                        request.transactionUuid(),
+                        AccountingOperationType.EXTERNAL_TRANSFER,
+                        getAccountingProductType(account),
+                        null,
+                        request.amount(),
+                        EXTERNAL_TRANSFER_COMMISSION,
+                        descriptionOrDefault(
+                                request.reference(),
+                                "Transferencia interbancaria a " + request.externalBankName()
+                                        + " cuenta " + request.externalAccountNumber()),
+                        accountingDate
+                )
+        );
+
+        AccountDomainService.validateSufficientBalance(account, accountingResult.totalDebited());
+        AccountDomainService.debit(account, accountingResult.totalDebited());
+        accountRepository.save(account);
+
+        AccountTransaction transaction = transactionRepository.save(createTransaction(
+                account,
+                new TransactionCreationData(
+                        accountingResult.totalDebited(),
+                        TransactionType.DEBITO,
+                        TransactionSubtypeCode.TRF_EXT_S,
+                        request.transactionUuid(),
+                        accountingDate,
+                        account.getAvailableBalance(),
+                        descriptionOrDefault(
+                                request.reference(),
+                                "Transferencia interbancaria a " + request.externalBankName()
+                                        + " cuenta " + request.externalAccountNumber())
+                )
+        ));
+
+        return new ExternalTransferResponseDTO(
+                transaction.getTransactionUuid(),
+                account.getAccountNumber(),
+                request.amount(),
+                accountingResult.commissionAmount(),
+                accountingResult.ivaAmount(),
+                accountingResult.totalDebited(),
+                account.getAvailableBalance(),
+                transaction.getStatus(),
+                transaction.getAccountingDate()
+        );
+    }
+
+    @Transactional
+    public CorporateRefundResponseDTO executeCorporateRefund(CorporateRefundReqDTO request) {
+        validateIdempotency(request.transactionUuid());
+        Account account = getAccountForUpdate(request.accountNumber());
+        validateActiveAccount(account);
+        partyServiceClient.validateActiveCustomer(account.getCustomerId());
+        AccountDomainService.credit(account, request.refundAmount());
+        accountRepository.save(account);
+
+        LocalDate accountingDate = accountingDateService.resolveAccountingDate();
+        AccountTransaction transaction = transactionRepository.save(createTransaction(
+                account,
+                new TransactionCreationData(
+                        request.refundAmount(),
+                        TransactionType.CREDITO,
+                        TransactionSubtypeCode.DEV_EMP,
+                        request.transactionUuid(),
+                        accountingDate,
+                        account.getAvailableBalance(),
+                        "Refund rejected lines batch " + request.batchId()
+                )
+        ));
+        accountingServiceClient.postOperation(new AccountingOperationReqDTO(
+                request.transactionUuid(),
+                AccountingOperationType.CORPORATE_REFUND,
+                getAccountingProductType(account),
+                request.refundAmount(),
+                BigDecimal.ZERO,
+                "Corporate refund batch " + request.batchId(),
+                accountingDate
+        ));
+        return new CorporateRefundResponseDTO(
+                transaction.getTransactionUuid(),
+                request.refundAmount(),
+                transaction.getStatus(),
+                transaction.getAccountingDate()
+        );
+    }
+    private void validateIdempotency(String transactionUuid) {
+        LocalDateTime from = LocalDateTime.now(BANK_ZONE).minusDays(1);
+        if (transactionRepository.existsByTransactionUuidAndTransactionDateAfter(transactionUuid, from)) {
+            throw new DuplicateTransactionException(transactionUuid);
+        }
+    }
+    private Account getAccountForUpdate(Long accountId) {
+        return accountRepository.findWithLockById(accountId)
+                .orElseThrow(() -> new AccountNotFoundException(accountId));
+    }
+    private Account getAccountForUpdate(String accountNumber) {
+        return accountRepository.findWithLockByAccountNumber(accountNumber)
+                .orElseThrow(() -> new AccountNotFoundException(accountNumber));
+    }
+    private void validateActiveAccount(Account account) {
+        if (account.getStatus() != AccountStatus.ACTIVA) {
+            throw new InactiveAccountException(account.getAccountNumber());
+        }
+    }
+    private AccountTransaction createTransaction(Account account, TransactionCreationData data) {
+        AccountTransaction transaction = new AccountTransaction();
+        transaction.setAccount(account);
+        transaction.setAmount(data.amount());
+        transaction.setMovementType(data.transactionType());
+        transaction.setTransactionSubtype(getTransactionSubtype(data.transactionSubtype()));
+        transaction.setTransactionUuid(data.transactionUuid());
+        transaction.setAccountingDate(data.accountingDate());
+        transaction.setResultingBalance(data.resultingBalance());
+        transaction.setStatus(TransactionStatus.COMPLETADA);
+        transaction.setDescription(data.description());
+        return transaction;
+    }
+    private OperationResponseDTO toOperationResponse(AccountTransaction transaction, BigDecimal newBalance) {
+        return new OperationResponseDTO(
+                transaction.getTransactionUuid(),
+                transaction.getAccountingDate(),
+                newBalance,
+                transaction.getStatus(),
+                LocalDateTime.now(BANK_ZONE)
+        );
+    }
+    private void notifyTransaction(Account account, TransactionType type, BigDecimal amount, BigDecimal newBalance) {
+        try {
+            String email = this.partyServiceClient.getCustomerEmail(account.getCustomerId());
+            if (email == null || email.isBlank()) {
+                return;
+            }
+            String customerName = this.partyServiceClient.getHolderNameByAccount(account.getAccountNumber());
+            this.notificationGrpcClient.sendNotification(
+                    email,
+                    "BanQuito - " + (type == TransactionType.CREDITO ? "Depósito" : "Retiro") + " en tu cuenta " + account.getAccountNumber(),
+                    "TRANSACTION_EXECUTED",
+                    Map.of(
+                            "customerName", customerName != null ? customerName : "",
+                            "accountNumber", account.getAccountNumber(),
+                            "transactionType", type.name(),
+                            "amount", amount.toPlainString(),
+                            "newBalance", newBalance.toPlainString(),
+                            "date", LocalDate.now(BANK_ZONE).toString()
+                    )
+            );
+        } catch (Exception ignored) {
+        }
+    }
+    private AccountingProductType getAccountingProductType(Account account) {
+        AccountSuperType superType = account.getAccountSubtype().getSuperType();
+        return switch (superType) {
+            case AHORROS -> AccountingProductType.SAVINGS;
+            case CORRIENTE -> AccountingProductType.CHECKING;
+        };
+    }
+    private TransactionSubtype getTransactionSubtype(TransactionSubtypeCode subtypeCode) {
+        return transactionSubtypeRepository.findByCode(subtypeCode.name())
+                .orElseThrow(() -> new IllegalStateException("Transaction subtype is not configured: " + subtypeCode.name()));
+    }
+    private String descriptionOrDefault(String description, String defaultDescription) {
+        return description == null || description.isBlank() ? defaultDescription : description;
+    }
+    private record TransactionCreationData(
+            BigDecimal amount,
+            TransactionType transactionType,
+            TransactionSubtypeCode transactionSubtype,
+            String transactionUuid,
+            LocalDate accountingDate,
+            BigDecimal resultingBalance,
+            String description
+    ) {}
+}

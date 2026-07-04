@@ -1,0 +1,68 @@
+package ec.edu.espe.banquito.core.accountcore.service;
+
+import ec.edu.espe.banquito.core.accountcore.client.NotificationGrpcClient;
+import ec.edu.espe.banquito.core.accountcore.client.PartyServiceClient;
+import ec.edu.espe.banquito.core.accountcore.enums.AccountStatus;
+import ec.edu.espe.banquito.core.accountcore.exception.AccountNotFoundException;
+import ec.edu.espe.banquito.core.accountcore.model.Account;
+import ec.edu.espe.banquito.core.accountcore.repository.AccountRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.Map;
+
+@Service
+public class AccountStatusService {
+
+    private static final ZoneId BANK_ZONE = ZoneId.of("America/Guayaquil");
+
+    private final AccountRepository accountRepository;
+    private final PartyServiceClient partyServiceClient;
+    private final NotificationGrpcClient notificationGrpcClient;
+
+    public AccountStatusService(AccountRepository accountRepository,
+                                 PartyServiceClient partyServiceClient,
+                                 NotificationGrpcClient notificationGrpcClient) {
+        this.accountRepository = accountRepository;
+        this.partyServiceClient = partyServiceClient;
+        this.notificationGrpcClient = notificationGrpcClient;
+    }
+
+    @Transactional
+    public AccountStatus changeStatus(String accountNumber, AccountStatus newStatus) {
+        Account account = this.accountRepository.findByAccountNumber(accountNumber)
+                .orElseThrow(() -> new AccountNotFoundException(accountNumber));
+
+        account.setStatus(newStatus);
+        AccountStatus savedStatus = this.accountRepository.save(account).getStatus();
+
+        notifyStatusChange(account, savedStatus);
+
+        return savedStatus;
+    }
+
+    private void notifyStatusChange(Account account, AccountStatus newStatus) {
+        try {
+            String email = this.partyServiceClient.getCustomerEmail(account.getCustomerId());
+            if (email == null || email.isBlank()) {
+                return;
+            }
+            String customerName = this.partyServiceClient.getHolderNameByAccount(account.getAccountNumber());
+
+            this.notificationGrpcClient.sendNotification(
+                    email,
+                    "BanQuito - Cambio de estado en tu cuenta " + account.getAccountNumber(),
+                    "ACCOUNT_STATUS_CHANGED",
+                    Map.of(
+                            "customerName", customerName != null ? customerName : "",
+                            "accountNumber", account.getAccountNumber(),
+                            "newStatus", newStatus.name(),
+                            "date", LocalDate.now(BANK_ZONE).toString()
+                    )
+            );
+        } catch (Exception ignored) {
+        }
+    }
+}
