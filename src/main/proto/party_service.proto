@@ -3,7 +3,7 @@ syntax = "proto3";
 package banquito.party.v2;
 
 option java_multiple_files = true;
-option java_package = "ec.edu.espe.banquito.accountcore.grpc.party";
+option java_package = "ec.edu.espe.banquito.core.accountcore.grpc.party";
 option java_outer_classname = "PartyServiceProto";
 
 service PartyService {
