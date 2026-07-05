@@ -278,7 +278,7 @@ public class AccountTransactionService {
                             creditItem.transactionUuid(),
                             accountingDate,
                             account.getAvailableBalance(),
-                            descriptionOrDefault(creditItem.reference(), "Batch credit " + request.batchId())
+                            descriptionOrDefault(creditItem.reference(), "Abono de nómina, lote " + request.batchId())
                     )
             ));
 
@@ -291,7 +291,7 @@ public class AccountTransactionService {
                     BigDecimal.ZERO,
                     descriptionOrDefault(
                             creditItem.reference(),
-                            "Batch credit " + request.batchId() + " account " + account.getId()),
+                            "Abono de nómina, lote " + request.batchId()),
                     accountingDate
             ));
 
@@ -322,7 +322,7 @@ public class AccountTransactionService {
                         null,
                         request.totalAmount(),
                         request.commissionAmount(),
-                        "Corporate debit batch " + request.batchId(),
+                        "Débito de lote de nómina, lote " + request.batchId(),
                         accountingDate
                 )
         );
@@ -340,7 +340,7 @@ public class AccountTransactionService {
                         request.transactionUuid(),
                         accountingDate,
                         account.getAvailableBalance(),
-                        "Corporate debit batch " + request.batchId()
+                        "Débito de lote de nómina, lote " + request.batchId()
                 )
         ));
 
@@ -431,7 +431,7 @@ public class AccountTransactionService {
                         request.transactionUuid(),
                         accountingDate,
                         account.getAvailableBalance(),
-                        "Refund rejected lines batch " + request.batchId()
+                        "Devolución de líneas rechazadas, lote " + request.batchId()
                 )
         ));
         accountingServiceClient.postOperation(new AccountingOperationReqDTO(
@@ -440,7 +440,7 @@ public class AccountTransactionService {
                 getAccountingProductType(account),
                 request.refundAmount(),
                 BigDecimal.ZERO,
-                "Corporate refund batch " + request.batchId(),
+                "Devolución de líneas rechazadas, lote " + request.batchId(),
                 accountingDate
         ));
         return new CorporateRefundResponseDTO(
