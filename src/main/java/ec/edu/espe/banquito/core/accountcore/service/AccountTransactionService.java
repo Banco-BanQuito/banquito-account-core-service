@@ -13,6 +13,8 @@ import ec.edu.espe.banquito.core.accountcore.dto.CorporateRefundReqDTO;
 import ec.edu.espe.banquito.core.accountcore.dto.CorporateRefundResponseDTO;
 import ec.edu.espe.banquito.core.accountcore.dto.ExternalTransferReqDTO;
 import ec.edu.espe.banquito.core.accountcore.dto.ExternalTransferResponseDTO;
+import ec.edu.espe.banquito.core.accountcore.dto.OffUsSettlementReqDTO;
+import ec.edu.espe.banquito.core.accountcore.dto.OffUsSettlementResponseDTO;
 import ec.edu.espe.banquito.core.accountcore.dto.OperationResponseDTO;
 import ec.edu.espe.banquito.core.accountcore.dto.TellerTransactionReqDTO;
 import ec.edu.espe.banquito.core.accountcore.dto.TransactionHistoryDTO;
@@ -450,6 +452,30 @@ public class AccountTransactionService {
                 transaction.getAccountingDate()
         );
     }
+
+    @Transactional
+    public OffUsSettlementResponseDTO executeOffUsSettlement(OffUsSettlementReqDTO request) {
+        // No customer Account is involved here, so idempotency relies on accounting-service's
+        // own entryUuid dedup (registerEntry returns the existing entry for a repeated UUID).
+        LocalDate accountingDate = accountingDateService.resolveAccountingDate();
+        accountingServiceClient.postOperation(new AccountingOperationReqDTO(
+                request.transactionUuid(),
+                AccountingOperationType.OFFUS_SETTLEMENT,
+                null,
+                request.amount(),
+                BigDecimal.ZERO,
+                "Liquidación de compensación interbancaria, lote " + request.batchId(),
+                accountingDate
+        ));
+
+        return new OffUsSettlementResponseDTO(
+                request.transactionUuid(),
+                request.amount(),
+                TransactionStatus.COMPLETADA,
+                accountingDate
+        );
+    }
+
     private void validateIdempotency(String transactionUuid) {
         LocalDateTime from = LocalDateTime.now(BANK_ZONE).minusDays(1);
         if (transactionRepository.existsByTransactionUuidAndTransactionDateAfter(transactionUuid, from)) {
