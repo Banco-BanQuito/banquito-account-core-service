@@ -7,5 +7,6 @@ public enum AccountingOperationType {
     BATCH_CREDIT,
     CORPORATE_DEBIT,
     CORPORATE_REFUND,
-    EXTERNAL_TRANSFER
+    EXTERNAL_TRANSFER,
+    OFFUS_SETTLEMENT
 }

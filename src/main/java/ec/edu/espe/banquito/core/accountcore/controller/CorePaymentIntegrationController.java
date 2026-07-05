@@ -6,6 +6,8 @@ import ec.edu.espe.banquito.core.accountcore.dto.CorporateDebitReqDTO;
 import ec.edu.espe.banquito.core.accountcore.dto.CorporateDebitResponseDTO;
 import ec.edu.espe.banquito.core.accountcore.dto.CorporateRefundReqDTO;
 import ec.edu.espe.banquito.core.accountcore.dto.CorporateRefundResponseDTO;
+import ec.edu.espe.banquito.core.accountcore.dto.OffUsSettlementReqDTO;
+import ec.edu.espe.banquito.core.accountcore.dto.OffUsSettlementResponseDTO;
 import ec.edu.espe.banquito.core.accountcore.service.AccountTransactionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -64,5 +66,16 @@ public class CorePaymentIntegrationController {
     @ApiResponse(responseCode = "409", description = "Duplicated transaction UUID")
     public ResponseEntity<CorporateRefundResponseDTO> corporateRefund(@Valid @RequestBody CorporateRefundReqDTO request) {
         return ResponseEntity.ok(transactionService.executeCorporateRefund(request));
+    }
+
+    @PostMapping("/offus-settlement")
+    @Operation(summary = "Register off-us clearinghouse settlement",
+            description = "Records the accounting entry for an interbank compensation batch settled by the Switch's clearinghouse. This is the only entry point the Switch may use to post accounting movements — it never calls accounting-service directly.")
+    @ApiResponse(responseCode = "200", description = "Settlement recorded",
+            content = @Content(schema = @Schema(implementation = OffUsSettlementResponseDTO.class)))
+    @ApiResponse(responseCode = "400", description = "Invalid request")
+    @ApiResponse(responseCode = "409", description = "Duplicated transaction UUID")
+    public ResponseEntity<OffUsSettlementResponseDTO> offUsSettlement(@Valid @RequestBody OffUsSettlementReqDTO request) {
+        return ResponseEntity.ok(transactionService.executeOffUsSettlement(request));
     }
 }
