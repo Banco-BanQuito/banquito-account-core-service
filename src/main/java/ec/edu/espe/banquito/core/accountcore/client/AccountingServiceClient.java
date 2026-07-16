@@ -5,6 +5,7 @@ import ec.edu.espe.banquito.core.accountcore.dto.AccountingOperationResponseDTO;
 import ec.edu.espe.banquito.core.accountcore.grpc.accounting.AccountingEntryResponse;
 import ec.edu.espe.banquito.core.accountcore.grpc.accounting.AccountingOperationRequest;
 import ec.edu.espe.banquito.core.accountcore.grpc.accounting.AccountingServiceGrpc;
+import ec.edu.espe.banquito.core.accountcore.grpc.accounting.ReverseOperationRequest;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import jakarta.annotation.PreDestroy;
@@ -36,6 +37,18 @@ public class AccountingServiceClient {
                 .withDeadlineAfter(5, TimeUnit.SECONDS)
                 .postOperation(toGrpcRequest(request));
         return toResponse(response);
+    }
+
+    /**
+     * RF-01: compensacion explicita. El Core llama esto para deshacer un asiento que
+     * accounting-service ya registro, cuando el propio trabajo local del Core falla
+     * despues de esa llamada (bases de datos separadas, el rollback local no alcanza
+     * al lado remoto).
+     */
+    public void reverseOperation(String entryUuid) {
+        accountingService
+                .withDeadlineAfter(5, TimeUnit.SECONDS)
+                .reverseOperation(ReverseOperationRequest.newBuilder().setEntryUuid(entryUuid).build());
     }
 
     @PreDestroy

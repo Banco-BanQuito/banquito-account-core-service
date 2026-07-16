@@ -37,6 +37,7 @@ import ec.edu.espe.banquito.core.accountcore.model.TransactionSubtype;
 import ec.edu.espe.banquito.core.accountcore.repository.AccountRepository;
 import ec.edu.espe.banquito.core.accountcore.repository.AccountTransactionRepository;
 import ec.edu.espe.banquito.core.accountcore.repository.TransactionSubtypeRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -52,6 +53,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Service
+@Slf4j
 public class AccountTransactionService {
 
     private static final ZoneId BANK_ZONE = ZoneId.of("America/Guayaquil");
@@ -329,22 +331,28 @@ public class AccountTransactionService {
                 )
         );
 
-        AccountDomainService.validateSufficientBalance(account, accountingResult.totalDebited());
-        AccountDomainService.debit(account, accountingResult.totalDebited());
-        accountRepository.save(account);
+        AccountTransaction transaction;
+        try {
+            AccountDomainService.validateSufficientBalance(account, accountingResult.totalDebited());
+            AccountDomainService.debit(account, accountingResult.totalDebited());
+            accountRepository.save(account);
 
-        AccountTransaction transaction = transactionRepository.save(createTransaction(
-                account,
-                new TransactionCreationData(
-                        accountingResult.totalDebited(),
-                        TransactionType.DEBITO,
-                        TransactionSubtypeCode.DEB_EMP,
-                        request.transactionUuid(),
-                        accountingDate,
-                        account.getAvailableBalance(),
-                        "Débito de lote de nómina, lote " + request.batchId()
-                )
-        ));
+            transaction = transactionRepository.save(createTransaction(
+                    account,
+                    new TransactionCreationData(
+                            accountingResult.totalDebited(),
+                            TransactionType.DEBITO,
+                            TransactionSubtypeCode.DEB_EMP,
+                            request.transactionUuid(),
+                            accountingDate,
+                            account.getAvailableBalance(),
+                            "Débito de lote de nómina, lote " + request.batchId()
+                    )
+            ));
+        } catch (RuntimeException e) {
+            compensateAccounting(accountingResult.entryUuid(), "executeCorporateDebit", e);
+            throw e;
+        }
 
         return new CorporateDebitResponseDTO(
                 transaction.getTransactionUuid(),
@@ -381,25 +389,31 @@ public class AccountTransactionService {
                 )
         );
 
-        AccountDomainService.validateSufficientBalance(account, accountingResult.totalDebited());
-        AccountDomainService.debit(account, accountingResult.totalDebited());
-        accountRepository.save(account);
+        AccountTransaction transaction;
+        try {
+            AccountDomainService.validateSufficientBalance(account, accountingResult.totalDebited());
+            AccountDomainService.debit(account, accountingResult.totalDebited());
+            accountRepository.save(account);
 
-        AccountTransaction transaction = transactionRepository.save(createTransaction(
-                account,
-                new TransactionCreationData(
-                        accountingResult.totalDebited(),
-                        TransactionType.DEBITO,
-                        TransactionSubtypeCode.TRF_EXT_S,
-                        request.transactionUuid(),
-                        accountingDate,
-                        account.getAvailableBalance(),
-                        descriptionOrDefault(
-                                request.reference(),
-                                "Transferencia interbancaria a " + request.externalBankName()
-                                        + " cuenta " + request.externalAccountNumber())
-                )
-        ));
+            transaction = transactionRepository.save(createTransaction(
+                    account,
+                    new TransactionCreationData(
+                            accountingResult.totalDebited(),
+                            TransactionType.DEBITO,
+                            TransactionSubtypeCode.TRF_EXT_S,
+                            request.transactionUuid(),
+                            accountingDate,
+                            account.getAvailableBalance(),
+                            descriptionOrDefault(
+                                    request.reference(),
+                                    "Transferencia interbancaria a " + request.externalBankName()
+                                            + " cuenta " + request.externalAccountNumber())
+                    )
+            ));
+        } catch (RuntimeException e) {
+            compensateAccounting(accountingResult.entryUuid(), "executeExternalTransfer", e);
+            throw e;
+        }
 
         return new ExternalTransferResponseDTO(
                 transaction.getTransactionUuid(),
@@ -474,6 +488,22 @@ public class AccountTransactionService {
                 TransactionStatus.COMPLETADA,
                 accountingDate
         );
+    }
+
+    /**
+     * RF-01: si el trabajo local falla despues de que accounting-service ya registro
+     * el asiento, se compensa deshaciendolo alla explicitamente en vez de depender
+     * de que el rollback local (que no alcanza esa base de datos separada) lo arregle solo.
+     */
+    private void compensateAccounting(String entryUuid, String context, RuntimeException cause) {
+        try {
+            accountingServiceClient.reverseOperation(entryUuid);
+            log.warn("[RF-01][COMPENSACION] Asiento {} reversado tras fallo local en {}: {}",
+                    entryUuid, context, cause.getMessage());
+        } catch (Exception ex) {
+            log.error("[RF-01][COMPENSACION-FALLIDA] Asiento {} en {} requiere reconciliacion manual: {}",
+                    entryUuid, context, ex.getMessage());
+        }
     }
 
     private void validateIdempotency(String transactionUuid) {
