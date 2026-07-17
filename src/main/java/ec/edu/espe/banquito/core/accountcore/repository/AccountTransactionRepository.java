@@ -14,6 +14,8 @@ import java.util.List;
 public interface AccountTransactionRepository extends JpaRepository<AccountTransaction, Long> {
     boolean existsByTransactionUuidAndTransactionDateAfter(String uuid, LocalDateTime date);
 
+    boolean existsByTransactionUuidAndTransactionSubtype_Code(String transactionUuid, String subtypeCode);
+
     @Query("""
             select transaction
             from AccountTransaction transaction
