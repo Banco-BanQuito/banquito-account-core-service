@@ -10,6 +10,7 @@ public class AccountCoreApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(AccountCoreApplication.class, args);
+        System.out.println("CI/CD backend validation: account-core-service started");
     }
 
 }
