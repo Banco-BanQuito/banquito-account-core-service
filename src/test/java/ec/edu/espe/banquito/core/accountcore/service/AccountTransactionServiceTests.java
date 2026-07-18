@@ -25,6 +25,8 @@ import ec.edu.espe.banquito.core.accountcore.model.TransactionSubtype;
 import ec.edu.espe.banquito.core.accountcore.repository.AccountRepository;
 import ec.edu.espe.banquito.core.accountcore.repository.AccountTransactionRepository;
 import ec.edu.espe.banquito.core.accountcore.repository.TransactionSubtypeRepository;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,6 +35,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -48,6 +53,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -68,6 +74,8 @@ class AccountTransactionServiceTests {
     private ec.edu.espe.banquito.core.accountcore.client.NotificationGrpcClient notificationGrpcClient;
     @Mock
     private AccountingDateService accountingDateService;
+    @Mock
+    private PlatformTransactionManager transactionManager;
 
     private AccountTransactionService service;
 
@@ -80,12 +88,17 @@ class AccountTransactionServiceTests {
                 accountingServiceClient,
                 partyServiceClient,
                 notificationGrpcClient,
-                accountingDateService
+                accountingDateService,
+                transactionManager
         );
 
+        lenient().when(transactionManager.getTransaction(any(TransactionDefinition.class)))
+                .thenAnswer(invocation -> new SimpleTransactionStatus());
         lenient().when(accountingDateService.resolveAccountingDate())
                 .thenReturn(LocalDate.of(2026, Month.JUNE, 17));
         lenient().when(transactionRepository.existsByTransactionUuidAndTransactionDateAfter(anyString(), any()))
+                .thenReturn(false);
+        lenient().when(transactionRepository.existsByTransactionUuidAndTransactionSubtype_Code(anyString(), anyString()))
                 .thenReturn(false);
         lenient().when(transactionSubtypeRepository.findByCode(anyString()))
                 .thenAnswer(invocation -> Optional.of(transactionSubtype(invocation.getArgument(0))));
@@ -137,6 +150,70 @@ class AccountTransactionServiceTests {
         assertEquals(AccountingProductType.SAVINGS, operation.sourceAccountProductType());
         assertNull(operation.destinationAccountProductType());
         assertEquals(new BigDecimal("25.00"), operation.amount());
+    }
+
+    @Test
+    void compensatesDepositWhenAccountingRejectsSumaCero() {
+        Account account = account(1L, "2200000001", 1L, "100.00", AccountSuperType.AHORROS);
+        when(accountRepository.findWithLockById(1L)).thenReturn(Optional.of(account));
+        StatusRuntimeException rejection = new StatusRuntimeException(
+                Status.INVALID_ARGUMENT.withDescription("Suma Cero violada"));
+        when(accountingServiceClient.postOperation(any())).thenThrow(rejection);
+        TellerTransactionReqDTO request =
+                new TellerTransactionReqDTO(1L, new BigDecimal("25.00"), 10L, 1L, "deposit-rejected", null);
+
+        assertThrows(StatusRuntimeException.class, () -> service.executeDeposit(request));
+
+        assertEquals(new BigDecimal("100.00"), account.getAvailableBalance());
+        assertEquals(new BigDecimal("100.00"), account.getAccountingBalance());
+        verify(accountingServiceClient, never()).reverseOperation(anyString());
+
+        ArgumentCaptor<AccountTransaction> savedTransactions = ArgumentCaptor.forClass(AccountTransaction.class);
+        verify(transactionRepository, times(2)).save(savedTransactions.capture());
+        AccountTransaction depositTransaction = savedTransactions.getAllValues().get(0);
+        AccountTransaction reversalTransaction = savedTransactions.getAllValues().get(1);
+        assertEquals(TransactionStatus.COMPLETADA, depositTransaction.getStatus());
+        assertEquals(TransactionType.CREDITO, depositTransaction.getMovementType());
+        assertEquals(TransactionStatus.REVERSADA, reversalTransaction.getStatus());
+        assertEquals(TransactionType.DEBITO, reversalTransaction.getMovementType());
+        assertEquals(new BigDecimal("25.00"), reversalTransaction.getAmount());
+        assertEquals("deposit-rejected", reversalTransaction.getTransactionUuid());
+    }
+
+    @Test
+    void compensatesDepositWhenAccountingTimesOut() {
+        Account account = account(1L, "2200000001", 1L, "100.00", AccountSuperType.AHORROS);
+        when(accountRepository.findWithLockById(1L)).thenReturn(Optional.of(account));
+        StatusRuntimeException timeout = new StatusRuntimeException(Status.DEADLINE_EXCEEDED);
+        when(accountingServiceClient.postOperation(any())).thenThrow(timeout);
+        TellerTransactionReqDTO request =
+                new TellerTransactionReqDTO(1L, new BigDecimal("25.00"), 10L, 1L, "deposit-timeout", null);
+
+        assertThrows(StatusRuntimeException.class, () -> service.executeDeposit(request));
+
+        assertEquals(new BigDecimal("100.00"), account.getAvailableBalance());
+        ArgumentCaptor<AccountTransaction> savedTransactions = ArgumentCaptor.forClass(AccountTransaction.class);
+        verify(transactionRepository, times(2)).save(savedTransactions.capture());
+        AccountTransaction reversalTransaction = savedTransactions.getAllValues().get(1);
+        assertEquals(TransactionStatus.REVERSADA, reversalTransaction.getStatus());
+        assertEquals(new BigDecimal("25.00"), reversalTransaction.getAmount());
+    }
+
+    @Test
+    void doesNotDuplicateCompensationWhenReversalAlreadyExists() {
+        Account account = account(1L, "2200000001", 1L, "100.00", AccountSuperType.AHORROS);
+        when(accountRepository.findWithLockById(1L)).thenReturn(Optional.of(account));
+        when(accountingServiceClient.postOperation(any()))
+                .thenThrow(new StatusRuntimeException(Status.INVALID_ARGUMENT));
+        when(transactionRepository.existsByTransactionUuidAndTransactionSubtype_Code("deposit-retry", "DEP_REV"))
+                .thenReturn(true);
+        TellerTransactionReqDTO request =
+                new TellerTransactionReqDTO(1L, new BigDecimal("25.00"), 10L, 1L, "deposit-retry", null);
+
+        assertThrows(StatusRuntimeException.class, () -> service.executeDeposit(request));
+
+        assertEquals(new BigDecimal("125.00"), account.getAvailableBalance());
+        verify(transactionRepository, times(1)).save(any(AccountTransaction.class));
     }
 
     @Test
