@@ -678,12 +678,16 @@ public class AccountTransactionService {
         }
     }
     private Account getAccountForUpdate(Long accountId) {
-        return accountRepository.findWithLockById(accountId)
+        Account account = accountRepository.findWithLockById(accountId)
                 .orElseThrow(() -> new AccountNotFoundException(accountId));
+        account.getAccountSubtype().getSuperType();
+        return account;
     }
     private Account getAccountForUpdate(String accountNumber) {
-        return accountRepository.findWithLockByAccountNumber(accountNumber)
+        Account account = accountRepository.findWithLockByAccountNumber(accountNumber)
                 .orElseThrow(() -> new AccountNotFoundException(accountNumber));
+        account.getAccountSubtype().getSuperType();
+        return account;
     }
     private void validateActiveAccount(Account account) {
         if (account.getStatus() != AccountStatus.ACTIVA) {
