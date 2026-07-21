@@ -2,6 +2,7 @@ package ec.edu.espe.banquito.core.accountcore.repository;
 
 import ec.edu.espe.banquito.core.accountcore.model.Account;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import java.util.List;
@@ -14,9 +15,11 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
 
     Optional<Account> findFirstByCustomerIdAndFavoriteTrueOrderByAccountNumberAsc(Long customerId);
 
+    @EntityGraph(attributePaths = "accountSubtype")
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Account> findWithLockByAccountNumber(String accountNumber);
 
+    @EntityGraph(attributePaths = "accountSubtype")
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Account> findWithLockById(Long id);
 
