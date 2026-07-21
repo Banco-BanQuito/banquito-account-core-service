@@ -35,7 +35,7 @@ jobs:
           cache: maven
 
       - name: Build JAR
-        run: mvn -q -DskipTests package
+        run: mvn -q -Dmaven.test.skip=true package
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
