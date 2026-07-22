@@ -13,6 +13,8 @@ public record BatchCreditReqDTO(
         @NotNull(message = "Batch ID is required")
         String batchId,
 
+        String originAccountNumber,
+
         @NotEmpty(message = "Credits are required")
         List<@Valid CreditItemDTO> credits
 ) {

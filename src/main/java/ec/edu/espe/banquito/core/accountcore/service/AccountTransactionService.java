@@ -347,7 +347,7 @@ public class AccountTransactionService {
                                 "Abono de nómina, lote " + request.batchId()),
                         accountingDate,
                         BigDecimal.ZERO,
-                        "LOTE " + request.batchId(),
+                        request.originAccountNumber(),
                         result.account().getAccountNumber(),
                         partyServiceClient.getHolderNameByAccount(result.account().getAccountNumber())
                 ));
@@ -393,8 +393,8 @@ public class AccountTransactionService {
                         accountingDate,
                         BigDecimal.ZERO,
                         account.getAccountNumber(),
-                        "LOTE " + request.batchId(),
-                        "Pago masivo"
+                        null,
+                        "Pago masivo lote " + request.batchId()
                 )
         );
 
@@ -536,7 +536,7 @@ public class AccountTransactionService {
                     "Devolución de líneas rechazadas, lote " + request.batchId(),
                     accountingDate,
                     BigDecimal.ZERO,
-                    "LOTE " + request.batchId(),
+                    null,
                     result.account().getAccountNumber(),
                     partyServiceClient.getHolderNameByAccount(result.account().getAccountNumber())
             ));
