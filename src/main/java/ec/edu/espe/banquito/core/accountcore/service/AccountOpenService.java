@@ -20,6 +20,7 @@ import java.time.ZoneId;
 public class AccountOpenService {
 
     private static final ZoneId BANK_ZONE = ZoneId.of("America/Guayaquil");
+    private static final String ACCOUNT_NUMBER_PREFIX = "10101";
 
     private final AccountRepository accountRepository;
     private final AccountSubtypeRepository accountSubtypeRepository;
@@ -47,7 +48,7 @@ public class AccountOpenService {
         }
 
         String branchCode = branch.getBranchCode();
-        String accountNumber = generateAccountNumber(branchCode);
+        String accountNumber = generateAccountNumber();
 
         BigDecimal deposit = req.initialDeposit() != null ? req.initialDeposit() : BigDecimal.ZERO;
 
@@ -76,14 +77,14 @@ public class AccountOpenService {
         );
     }
 
-    private String generateAccountNumber(String branchCode) {
+    private String generateAccountNumber() {
         return accountRepository
-                .findTopByAccountNumberStartingWithOrderByAccountNumberDesc(branchCode)
+                .findTopByAccountNumberStartingWithOrderByAccountNumberDesc(ACCOUNT_NUMBER_PREFIX)
                 .map(last -> {
-                    long seq = Long.parseLong(last.getAccountNumber().substring(branchCode.length())) + 1;
-                    return branchCode + String.format("%07d", seq);
+                    long seq = Long.parseLong(last.getAccountNumber().substring(ACCOUNT_NUMBER_PREFIX.length())) + 1;
+                    return ACCOUNT_NUMBER_PREFIX + String.format("%05d", seq);
                 })
-                .orElse(branchCode + "0000001");
+                .orElse(ACCOUNT_NUMBER_PREFIX + "00001");
     }
 
 }

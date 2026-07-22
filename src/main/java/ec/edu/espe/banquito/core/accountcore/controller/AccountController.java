@@ -179,7 +179,7 @@ public class AccountController {
     }
 
     @PostMapping("/open")
-    @Operation(summary = "Open new account", description = "Creates a new account for a customer with account number prefixed by branch code.")
+    @Operation(summary = "Open new account", description = "Creates a new account for a customer with the BanQuito account number prefix.")
     @ApiResponse(responseCode = "200", description = "Account opened",
             content = @Content(schema = @Schema(implementation = AccountOpenResponseDTO.class)))
     @ApiResponse(responseCode = "400", description = "Invalid request or unknown subtype")
