@@ -149,7 +149,11 @@ public class AccountTransactionService {
                     request.amount(),
                     null,
                     descriptionOrDefault(request.reference(), "Teller deposit account " + result.account().getId()),
-                    accountingDate
+                    accountingDate,
+                    BigDecimal.ZERO,
+                    "EFECTIVO",
+                    result.account().getAccountNumber(),
+                    partyServiceClient.getHolderNameByAccount(result.account().getAccountNumber())
             ));
         } catch (StatusRuntimeException e) {
             compensateLocalMovement(result, "executeDeposit", e);
@@ -198,7 +202,11 @@ public class AccountTransactionService {
                     request.amount(),
                     null,
                     descriptionOrDefault(request.reference(), "Teller withdrawal account " + result.account().getId()),
-                    accountingDate
+                    accountingDate,
+                    BigDecimal.ZERO,
+                    result.account().getAccountNumber(),
+                    "EFECTIVO",
+                    partyServiceClient.getHolderNameByAccount(result.account().getAccountNumber())
             ));
         } catch (StatusRuntimeException e) {
             compensateLocalMovement(result, "executeWithdrawal", e);
@@ -260,6 +268,8 @@ public class AccountTransactionService {
             return new P2PLocalMovementResult(sourceAccount, debitTransaction, destinationAccount, creditTransaction);
         });
 
+        String destinationHolderName = partyServiceClient.getHolderNameByAccount(result.destinationAccount().getAccountNumber());
+
         try {
             accountingServiceClient.postOperation(new AccountingOperationReqDTO(
                     request.transactionUuid(),
@@ -272,7 +282,11 @@ public class AccountTransactionService {
                             request.reference(),
                             "Internal P2P transfer " + result.sourceAccount().getAccountNumber()
                                     + " to " + result.destinationAccount().getAccountNumber()),
-                    accountingDate
+                    accountingDate,
+                    BigDecimal.ZERO,
+                    result.sourceAccount().getAccountNumber(),
+                    result.destinationAccount().getAccountNumber(),
+                    destinationHolderName
             ));
         } catch (StatusRuntimeException e) {
             compensateP2PLocalMovement(result, e);
@@ -283,7 +297,7 @@ public class AccountTransactionService {
                 result.debitTransaction().getTransactionUuid(),
                 result.sourceAccount().getAvailableBalance(),
                 result.destinationAccount().getAccountNumber(),
-                partyServiceClient.getHolderNameByAccount(result.destinationAccount().getAccountNumber()),
+                destinationHolderName,
                 result.debitTransaction().getStatus(),
                 result.debitTransaction().getAccountingDate()
         );
@@ -331,7 +345,11 @@ public class AccountTransactionService {
                         descriptionOrDefault(
                                 creditItem.reference(),
                                 "Abono de nómina, lote " + request.batchId()),
-                        accountingDate
+                        accountingDate,
+                        BigDecimal.ZERO,
+                        "LOTE " + request.batchId(),
+                        result.account().getAccountNumber(),
+                        partyServiceClient.getHolderNameByAccount(result.account().getAccountNumber())
                 ));
             } catch (StatusRuntimeException e) {
                 compensateLocalMovement(result, "executeBatchCredit", e);
@@ -372,7 +390,11 @@ public class AccountTransactionService {
                         request.totalAmount(),
                         request.commissionAmount(),
                         "Débito de lote de nómina, lote " + request.batchId(),
-                        accountingDate
+                        accountingDate,
+                        BigDecimal.ZERO,
+                        account.getAccountNumber(),
+                        "LOTE " + request.batchId(),
+                        "Pago masivo"
                 )
         );
 
@@ -430,7 +452,11 @@ public class AccountTransactionService {
                                 request.reference(),
                                 "Transferencia interbancaria a " + request.externalBankName()
                                         + " cuenta " + request.externalAccountNumber()),
-                        accountingDate
+                        accountingDate,
+                        BigDecimal.ZERO,
+                        account.getAccountNumber(),
+                        request.externalAccountNumber(),
+                        request.beneficiaryName()
                 )
         );
 
@@ -504,10 +530,15 @@ public class AccountTransactionService {
                     request.transactionUuid(),
                     AccountingOperationType.CORPORATE_REFUND,
                     getAccountingProductType(result.account()),
+                    null,
                     request.refundAmount(),
                     BigDecimal.ZERO,
                     "Devolución de líneas rechazadas, lote " + request.batchId(),
-                    accountingDate
+                    accountingDate,
+                    BigDecimal.ZERO,
+                    "LOTE " + request.batchId(),
+                    result.account().getAccountNumber(),
+                    partyServiceClient.getHolderNameByAccount(result.account().getAccountNumber())
             ));
         } catch (StatusRuntimeException e) {
             compensateLocalMovement(result, "executeCorporateRefund", e);
@@ -531,10 +562,15 @@ public class AccountTransactionService {
                 request.transactionUuid(),
                 AccountingOperationType.OFFUS_SETTLEMENT,
                 null,
+                null,
                 request.amount(),
                 BigDecimal.ZERO,
                 "Liquidación de compensación interbancaria, lote " + request.batchId(),
-                accountingDate
+                accountingDate,
+                BigDecimal.ZERO,
+                "CAMARA",
+                "BANQUITO",
+                "Liquidacion interbancaria"
         ));
 
         return new OffUsSettlementResponseDTO(

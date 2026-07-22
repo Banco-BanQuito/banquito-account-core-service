@@ -75,6 +75,15 @@ public class AccountingServiceClient {
         if (request.ivaAmount() != null && request.ivaAmount().compareTo(BigDecimal.ZERO) > 0) {
             builder.setIvaAmount(request.ivaAmount().toPlainString());
         }
+        if (request.sourceAccountNumber() != null && !request.sourceAccountNumber().isBlank()) {
+            builder.setSourceAccountNumber(request.sourceAccountNumber());
+        }
+        if (request.destinationAccountNumber() != null && !request.destinationAccountNumber().isBlank()) {
+            builder.setDestinationAccountNumber(request.destinationAccountNumber());
+        }
+        if (request.beneficiaryName() != null && !request.beneficiaryName().isBlank()) {
+            builder.setBeneficiaryName(request.beneficiaryName());
+        }
         return builder.build();
     }
 

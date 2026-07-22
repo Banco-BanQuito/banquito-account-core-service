@@ -15,7 +15,10 @@ public record AccountingOperationReqDTO(
         BigDecimal commissionAmount,
         String reference,
         LocalDate accountingDate,
-        BigDecimal ivaAmount
+        BigDecimal ivaAmount,
+        String sourceAccountNumber,
+        String destinationAccountNumber,
+        String beneficiaryName
 ) {
     public AccountingOperationReqDTO(
             String operationUuid,
@@ -25,8 +28,23 @@ public record AccountingOperationReqDTO(
             BigDecimal amount,
             BigDecimal commissionAmount,
             String reference,
+            LocalDate accountingDate,
+            BigDecimal ivaAmount) {
+        this(operationUuid, operationType, sourceAccountProductType, destinationAccountProductType, amount,
+                commissionAmount, reference, accountingDate, ivaAmount, null, null, null);
+    }
+
+    public AccountingOperationReqDTO(
+            String operationUuid,
+            AccountingOperationType operationType,
+            AccountingProductType sourceAccountProductType,
+            AccountingProductType destinationAccountProductType,
+            BigDecimal amount,
+            BigDecimal commissionAmount,
+            String reference,
             LocalDate accountingDate) {
-        this(operationUuid, operationType, sourceAccountProductType, destinationAccountProductType, amount, commissionAmount, reference, accountingDate, BigDecimal.ZERO);
+        this(operationUuid, operationType, sourceAccountProductType, destinationAccountProductType, amount,
+                commissionAmount, reference, accountingDate, BigDecimal.ZERO, null, null, null);
     }
 
     public AccountingOperationReqDTO(
@@ -37,6 +55,7 @@ public record AccountingOperationReqDTO(
             BigDecimal commissionAmount,
             String reference,
             LocalDate accountingDate) {
-        this(operationUuid, operationType, accountProductType, null, amount, commissionAmount, reference, accountingDate, BigDecimal.ZERO);
+        this(operationUuid, operationType, accountProductType, null, amount, commissionAmount, reference,
+                accountingDate, BigDecimal.ZERO, null, null, null);
     }
 }
